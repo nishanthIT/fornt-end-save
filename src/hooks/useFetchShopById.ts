@@ -1,5 +1,4 @@
-import { log } from "console";
-import { console } from "inspector";
+
 import { useState, useEffect } from "react";
 
 const useFetchShopById = (shopId: string) => {

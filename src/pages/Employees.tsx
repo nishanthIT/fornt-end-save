@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,14 +17,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, Plus, User, ChevronDown } from "lucide-react";
+import { Edit, Plus, User, ChevronDown, Trash  } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import useEmployeeData from "@/hooks/useEmployeeData"; // Adjust the import pat
+
 
 interface Employee {
   id: number;
   name: string;
-  phone: string;
+  phoneNo: string;
+  email:string;
+  password: string;
 }
 
 interface ProductActivity {
@@ -35,57 +39,12 @@ interface ProductActivity {
     count: number;
   }[];
 }
-
-const mockEmployees: Employee[] = [
-  { id: 1, name: "Alice Johnson", phone: "+1 234-567-8902" },
-  { id: 2, name: "Bob Wilson", phone: "+1 234-567-8903" },
-];
-
-// Mock activity data
-const mockActivityData: Record<number, ProductActivity[]> = {
-  1: [
-    {
-      date: "2024-01-16",
-      totalProducts: 120,
-      hourlyBreakdown: [
-        { hour: "9:00", count: 15 },
-        { hour: "10:00", count: 25 },
-        { hour: "11:00", count: 30 },
-        { hour: "12:00", count: 20 },
-        { hour: "13:00", count: 10 },
-        { hour: "14:00", count: 20 },
-      ],
-    },
-    {
-      date: "2024-01-15",
-      totalProducts: 95,
-      hourlyBreakdown: [
-        { hour: "9:00", count: 10 },
-        { hour: "10:00", count: 20 },
-        { hour: "11:00", count: 25 },
-        { hour: "12:00", count: 15 },
-        { hour: "13:00", count: 15 },
-        { hour: "14:00", count: 10 },
-      ],
-    },
-  ],
-  2: [
-    {
-      date: "2024-01-16",
-      totalProducts: 85,
-      hourlyBreakdown: [
-        { hour: "9:00", count: 10 },
-        { hour: "10:00", count: 15 },
-        { hour: "11:00", count: 20 },
-        { hour: "12:00", count: 15 },
-        { hour: "13:00", count: 15 },
-        { hour: "14:00", count: 10 },
-      ],
-    },
-  ],
-};
-
 const Employees = () => {
+
+
+  const { employees:mockEmployees, activityData:mockActivityData, loading } = useEmployeeData();
+
+
   const [employees, setEmployees] = useState(mockEmployees);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -95,30 +54,120 @@ const Employees = () => {
   const [showHourlyBreakdown, setShowHourlyBreakdown] = useState(false);
   const [newEmployee, setNewEmployee] = useState<Omit<Employee, "id">>({
     name: "",
-    phone: "",
+    phoneNo: "",
+    email:"",
+    password: "",
   });
+
+  useEffect(() => {
+    setEmployees(mockEmployees);
+  }, [mockEmployees]); // This will rerun whenever mockEmployees changes
+
 
   const handleEdit = (employee: Employee) => {
     setEditingEmployee(employee);
     setIsEditing(true);
   };
 
-  const handleSave = () => {
-    if (editingEmployee) {
-      setEmployees(employees.map(e => 
-        e.id === editingEmployee.id ? editingEmployee : e
-      ));
-      toast.success("Employee details updated successfully!");
-      setIsEditing(false);
+  const handleDelete = async (id) => {
+    const confirmDelete = window.confirm("Are you sure you want to delete this employee?");
+    if (confirmDelete) {
+      try {
+        // Send a DELETE request to the server
+        await fetch(`http://localhost:3000/api/deleteEmployee/${id}`, {
+          method: "DELETE",
+        });
+  
+        // Update the state to remove the deleted employee from the UI
+        setEmployees((prevEmployees) => prevEmployees.filter((employee) => employee.id !== id));
+  
+        alert("Employee deleted successfully!");
+      } catch (error) {
+        console.error("Error deleting employee:", error);
+        alert("Failed to delete the employee. Please try again.");
+      }
     }
   };
 
-  const handleAdd = () => {
-    const newId = Math.max(...employees.map(e => e.id)) + 1;
-    setEmployees([...employees, { ...newEmployee, id: newId }]);
-    setNewEmployee({ name: "", phone: "" });
-    setIsAdding(false);
-    toast.success("Employee added successfully!");
+  // const handleSave = () => {
+  //   if (editingEmployee) {
+  //     setEmployees(employees.map(e => 
+  //       e.id === editingEmployee.id ? editingEmployee : e
+  //     ));
+  //     toast.success("Employee details updated successfully!");
+  //     setIsEditing(false);
+  //   }
+  // };
+
+  // const handleAdd = () => {
+  //   const newId = Math.max(...employees.map(e => e.id)) + 1;
+  //   setEmployees([...employees, { ...newEmployee, id: newId }]);
+  //   setNewEmployee({ name: "", phone: "" });
+  //   setIsAdding(false);
+  //   toast.success("Employee added successfully!");
+  // };
+
+  const handleSave = async () => {
+    try {
+      const response = await fetch(`http://localhost:3000/api/updateEmployee/${editingEmployee.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editingEmployee),
+      });
+  
+      if (response.ok) {
+        const updatedEmployee = await response.json();
+        setEmployees(
+          employees.map((emp) =>
+            emp.id === updatedEmployee.id ? updatedEmployee : emp
+          )
+        );
+        toast.success('Employee updated successfully!');
+      } else {
+        toast.error('Failed to update employee.');
+      }
+    } catch (error) {
+      console.error('Error updating employee:', error);
+      toast.error('Something went wrong. Please try again later.');
+    } finally {
+      setIsEditing(false);
+      setEditingEmployee(null);
+    }
+  };
+
+
+
+  const handleAdd = async () => {
+    try {
+      const response = await fetch(' http://localhost:3000/api/addEmployee', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newEmployee.name,
+          phoneNo: newEmployee.phoneNo,
+          email: newEmployee.email,
+          password: newEmployee.password,
+        }),
+      });
+  
+      if (response.ok) {
+        const addedEmployee = await response.json();
+        setEmployees([...employees, addedEmployee]);
+        toast.success('Employee added successfully!');
+      } else {
+        toast.error('Failed to add employee. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error adding employee:', error);
+      toast.error('Something went wrong. Please try again later.');
+    } finally {
+      setIsAdding(false);
+      setNewEmployee({ name: '', phoneNo: '', email: '', password: '' });
+    }
   };
 
   const handleEmployeeClick = (employee: Employee) => {
@@ -142,7 +191,14 @@ const Employees = () => {
     return dayActivity?.hourlyBreakdown || [];
   };
 
+if(loading) {
+  return <p>Loading...</p>
+}
+
   return (
+
+
+
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Employees</h1>
@@ -152,7 +208,7 @@ const Employees = () => {
         </Button>
       </div>
 
-      <div className="space-y-4">
+      {/* <div className="space-y-4">
         {employees.map((employee) => (
           <Card key={employee.id} className="w-full">
             <CardContent className="p-4">
@@ -163,9 +219,21 @@ const Employees = () => {
                 >
                   <User className="h-8 w-8 text-gray-400" />
                   <div>
-                    <h3 className="font-semibold">{employee.name}</h3>
-                    <p className="text-sm text-gray-500">{employee.phone}</p>
-                  </div>
+  <div className="flex items-center mb-2">
+    <label className="font-bold text-gray-700 mr-2">Name:</label>
+    <h3 className="font-semibold">{employee.name}</h3>
+  </div>
+  <div className="flex items-center mb-2">
+    <label className="font-bold text-gray-700 mr-2">Phone:</label>
+    <p className="text-sm text-gray-500">{employee.phoneNo || "Not Provided"}</p>
+  </div>
+  <div className="flex items-center mb-2">
+    <label className="font-bold text-gray-700 mr-2">Email:</label>
+    <p className="text-sm text-gray-500">{employee.email || "Not Provided"}</p>
+  </div>
+
+</div>
+
                 </div>
                 <Button
                   variant="ghost"
@@ -177,11 +245,73 @@ const Employees = () => {
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
+                
+
+
               </div>
             </CardContent>
           </Card>
         ))}
-      </div>
+      </div> */}
+
+<div className="space-y-4">
+  {employees.map((employee) => (
+    <Card key={employee.id} className="w-full">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div 
+            className="flex items-center space-x-4 cursor-pointer"
+            onClick={() => handleEmployeeClick(employee)}
+          >
+            <User className="h-8 w-8 text-gray-400" />
+            <div>
+              <div className="flex items-center mb-2">
+                <label className="font-bold text-gray-700 mr-2">Name:</label>
+                <h3 className="font-semibold">{employee.name}</h3>
+              </div>
+              <div className="flex items-center mb-2">
+                <label className="font-bold text-gray-700 mr-2">Phone:</label>
+                <p className="text-sm text-gray-500">{employee.phoneNo || "Not Provided"}</p>
+              </div>
+              <div className="flex items-center mb-2">
+                <label className="font-bold text-gray-700 mr-2">Email:</label>
+                <p className="text-sm text-gray-500">{employee.email || "Not Provided"}</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            {/* Edit Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEdit(employee);
+              }}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+
+            {/* Delete Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(employee.id);
+              }}
+            >
+              <Trash className="h-4 w-4 text-red-500" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  ))}
+</div>
+
+
+
 
       {/* Activity Dialog */}
       <Dialog open={selectedEmployee !== null} onOpenChange={(open) => !open && setSelectedEmployee(null)}>
@@ -252,7 +382,7 @@ const Employees = () => {
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog open={isEditing} onOpenChange={setIsEditing}>
+      {/* <Dialog open={isEditing} onOpenChange={setIsEditing}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Employee Details</DialogTitle>
@@ -289,10 +419,71 @@ const Employees = () => {
             </div>
           )}
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
+     <Dialog open={isEditing} onOpenChange={setIsEditing}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Edit Employee</DialogTitle>
+    </DialogHeader>
+    <div className="space-y-4 py-4">
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Name</label>
+        <Input
+          value={editingEmployee?.name || ''}
+          onChange={(e) =>
+            setEditingEmployee({ ...editingEmployee, name: e.target.value })
+          }
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Phone Number</label>
+        <Input
+          value={editingEmployee?.phoneNo || ''}
+          onChange={(e) =>
+            setEditingEmployee({
+              ...editingEmployee,
+              phoneNo: e.target.value,
+            })
+          }
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Email</label>
+        <Input
+          value={editingEmployee?.email || ''}
+          onChange={(e) =>
+            setEditingEmployee({
+              ...editingEmployee,
+              email: e.target.value,
+            })
+          }
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Password</label>
+        <Input
+          type="password"
+          value={editingEmployee?.password || ''}
+          onChange={(e) =>
+            setEditingEmployee({
+              ...editingEmployee,
+              password: e.target.value,
+            })
+          }
+        />
+      </div>
+      <Button onClick={handleSave} className="w-full">
+        Save Changes
+      </Button>
+    </div>
+  </DialogContent>
+</Dialog>
+
+
+
 
       {/* Add Dialog */}
-      <Dialog open={isAdding} onOpenChange={setIsAdding}>
+      {/* <Dialog open={isAdding} onOpenChange={setIsAdding}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Employee</DialogTitle>
@@ -327,7 +518,73 @@ const Employees = () => {
             </Button>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
+      <Dialog open={isAdding} onOpenChange={setIsAdding}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Add New Employee</DialogTitle>
+    </DialogHeader>
+    <div className="space-y-4 py-4">
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Name</label>
+        <Input
+          value={newEmployee.name}
+          onChange={(e) =>
+            setNewEmployee({
+              ...newEmployee,
+              name: e.target.value,
+            })
+          }
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Phone Number</label>
+        <Input
+          value={newEmployee.phoneNo}
+          onChange={(e) =>
+            setNewEmployee({
+              ...newEmployee,
+              phoneNo: e.target.value,
+            })
+          }
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Email</label>
+        <Input
+          value={newEmployee.email || ''}
+          onChange={(e) =>
+            setNewEmployee({
+              ...newEmployee,
+              email: e.target.value,
+            })
+          }
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Password</label>
+        <Input
+          type="password"
+          value={newEmployee.password || ''}
+          onChange={(e) =>
+            setNewEmployee({
+              ...newEmployee,
+              password: e.target.value,
+            })
+          }
+        />
+      </div>
+      <Button onClick={handleAdd} className="w-full">
+        Add Employee
+      </Button>
+    </div>
+  </DialogContent>
+</Dialog>
+
+
+
+
+
     </div>
   );
 };
