@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 interface AddShopDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -46,7 +47,8 @@ export const AddShopDialog = ({
       if (response.ok) {
         const newShop = await response.json();
         onShopAdded(newShop); // Call the callback with the new shop
-        alert("Shop added successfully!");
+     
+        toast.success("Shop added successfully!");
         setFormData({ name: "", phone: "", address: "" });
         onOpenChange(false);
       } else {

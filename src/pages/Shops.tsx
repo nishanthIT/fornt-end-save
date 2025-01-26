@@ -148,6 +148,15 @@ const Shops = () => {
     setShops((prevShops) => [newShop, ...prevShops]);
   };
 
+
+  const handleUpdateShop = (updatedShop: Shop) => {
+    setShops((prevShops) =>
+      prevShops.map((shop) =>
+        shop.id === updatedShop.id ? updatedShop : shop
+      )
+    ); // Update the specific shop in the list
+  };
+
   const handleDelete = async (id: number) => {
     try {
       await axios.delete(`http://localhost:3000/api/shops/${id}`);
@@ -185,6 +194,7 @@ const Shops = () => {
             shop={shop}
             onClick={() => navigate(`/shop/${shop.id}`)}
             onDelete={handleDelete}
+            onUpdate={handleUpdateShop}  // Pass the update handler to the ShopCard
           />
         ))}
       </div>
