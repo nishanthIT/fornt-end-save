@@ -118,8 +118,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Store, Phone, MapPin, Plus, Save,PlusCircle, Barcode,Search } from "lucide-react";
+import { Store, Phone, MapPin, Plus, Save,PlusCircle, Barcode,Search,Camera, Upload } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
+import { ProductCardshop } from "@/components/ProductCardShop";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import useFetchProducts from "@/hooks/useFetchProducts";
@@ -132,27 +133,36 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-
+import BarcodeScannerComponent from "react-qr-barcode-scanner";
+import { toast } from "sonner";
 const ShopDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
 
+
+  const [barcode, setBarcode] = useState("");
+  const [caseBarcode, setCaseBarcode] = useState("");
+  const [title, setTitle] = useState("");
+  const [caseSize, setCaseSize] = useState("");
+  const [packetSize, setPacketSize] = useState("");
+  const [retailSize, setRetailSize] = useState("");
+  const [price, setPrice] = useState("");
+  const [Aiel, setAiel] = useState("");
+
+  const [image, setImage] = useState(null);
+
+
+  const [showScanner, setShowScanner] = useState(false);
+
+
+  
   const [activeTab, setActiveTab] = useState("availableProducts");
   const [searchQuery, setSearchQuery] = useState("");
-  
-
-
-
-
+  const [imageName, setImageName] = useState("");
   // Use the custom hook to fetch products
   const { products: fetchedProducts, loading, error } = useFetchProducts(searchQuery);
   const { products:AtShopFetchedProduct, loading:AtShoploading,error: AtShoperror } = useFetchProductsAtShop(id);
   const { shop, loading:Shoploading, error:Shoperror } = useFetchShopById(id);
-
-  // if (Shoploading) return <p>Loading...</p>;
-  // if (error) return <p>Error: {error}</p>;
-
 
   const [products, setProducts] = useState(AtShopFetchedProduct);
 
@@ -164,24 +174,72 @@ useEffect(() => {
 }, [AtShopFetchedProduct]); // Triggered when fetchedProducts changes
 
 
-  // const mockShops = [
-  //   {
-  //     id: 1,
-  //     name: "Downtown Store",
-  //     phone: "+1 234-567-8900",
-  //     address: "123 Main St, Downtown",
-  //   },
-  // ];
 
-  // const shop = mockShops.find((s) => s.id === Number(id));
-
-  // if (!shop) {
-  //   return <div className="container mx-auto p-6">Shop not found</div>;
-  // }
 
   const fallbackImg = "https://via.placeholder.com/64";
 
 
+
+
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImage(URL.createObjectURL(file));
+      if (file) {
+        setImageName(file.name);
+      }
+    }
+  };
+
+const shopId = id;
+const employeeId = 3;
+  const handleAddProduct =  async () => {
+
+    const productData = {
+
+      shopId,
+      title,
+      employeeId,
+      caseSize: parseInt(caseSize) || null,
+      packetSize: parseInt(packetSize) || null,
+      retailSize: parseInt(retailSize) || null,
+      barcode: null, // Set barcode if available
+      caseBarcode: caseBarcode || null,
+      price: parseFloat(price) || null,
+      aiel:Aiel || null,
+    }
+    try{
+      const responce = await fetch("http://localhost:3000/api/addProductAtShop",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body: JSON.stringify(productData),
+
+      });
+      const result = await responce.json();
+       
+      if(responce.ok){
+        toast.success("Product added successfully");
+        console.log("success",result)
+      }else {
+        alert(`Error: ${result.error}`);
+      }
+    }catch(error){
+      console.error(error);
+      alert("An error occured. Please try again later.");
+    }
+  }
+
+
+
+
+
+  const captureImage = () => {
+    // Logic for capturing image (camera API or third-party library)
+    alert("Capture image functionality goes here");
+  };
 
   const handlePriceChange = (productId, newPrice) => {
     setProducts((prev) =>
@@ -224,7 +282,8 @@ useEffect(() => {
                 Add Product
               </Button>
             </DialogTrigger>
-            <DialogContent>
+
+            {/* <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add New Product</DialogTitle>
               </DialogHeader>
@@ -241,12 +300,57 @@ useEffect(() => {
                 </div>
                 <Button className="w-full">Add Product</Button>
               </div>
-            </DialogContent>
+            </DialogContent> */}
+           <DialogContent className="max-h-[80vh] w-full md:w-[400px] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add New Product</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          
+          {/* Barcode Scanner & Manual Entry */}
+          <div className="space-y-2">
+            <label className="block font-semibold">Case Barcode</label>
+            <div className="flex space-x-2">
+              <Button className="w-full" variant="outline" onClick={() => setShowScanner(!showScanner)}>
+                <Barcode className="mr-2 h-4 w-4" />
+                {showScanner ? "Close Scanner" : "Scan"}
+              </Button>
+              <Input
+                type="text"
+                placeholder="Enter Barcode"
+                value={caseBarcode}
+                onChange={(e) => setCaseBarcode(e.target.value)}
+              />
+            </div>
+            {showScanner && (
+              <div className="border rounded-lg p-2">
+                <BarcodeScannerComponent
+                  width={300}
+                  height={200}
+                  onUpdate={(err, result) => {
+                    if (result) setCaseBarcode(result.text);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+          
+
+          {/* Other Fields */}
+         <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+         <Input type="text" placeholder="Case Size" value={caseSize} onChange={(e) => setCaseSize(e.target.value)} />
+         <Input type="text" placeholder="Packet Size" value={packetSize} onChange={(e) => setPacketSize(e.target.value)} />
+         <Input type="text" placeholder="Retail Size" value={retailSize} onChange={(e) => setRetailSize(e.target.value)} />
+         <Input type="number" placeholder="Price" value={price} onChange={(e) => setPrice(e.target.value)} />
+         <Input type="text" placeholder="Aiel no" value={Aiel} onChange={(e) => setAiel(e.target.value)} />
+
+         {/* Add Product Button */}
+         <Button className="w-full" onClick={handleAddProduct}>
+          Add Product
+        </Button>
+        </div>
+      </DialogContent>
           </Dialog>
-
-
-
-
           </div>
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -303,7 +407,7 @@ useEffect(() => {
             <div className="space-y-4">
               {fetchedProducts.length > 0 ? (
                 fetchedProducts.map((product) => (
-                  <ProductCard
+                  <ProductCardshop
                     key={product.id}
                     id={product.id}
                     title={product.title}
