@@ -148,10 +148,11 @@ const ShopDetail = () => {
   const [retailSize, setRetailSize] = useState("");
   const [price, setPrice] = useState("");
   const [Aiel, setAiel] = useState("");
+  const[rrp,setrrp] = useState("");
 
   const [image, setImage] = useState(null);
 
-
+const [isSubmitting, setIsSubmitting] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
 
@@ -165,6 +166,7 @@ const ShopDetail = () => {
   const { shop, loading:Shoploading, error:Shoperror } = useFetchShopById(id);
 
   const [products, setProducts] = useState(AtShopFetchedProduct);
+
 
 
 useEffect(() => {
@@ -208,8 +210,10 @@ const employeeId = 3;
       caseBarcode: caseBarcode || null,
       price: parseFloat(price) || null,
       aiel:Aiel || null,
+      rrp:rrp || null,
     }
     try{
+      setIsSubmitting(true)
       const responce = await fetch("http://localhost:3000/api/addProductAtShop",{
         method:"POST",
         headers:{
@@ -219,16 +223,28 @@ const employeeId = 3;
 
       });
       const result = await responce.json();
+      setIsSubmitting(false);
+        
+ 
        
       if(responce.ok){
+        setTitle("");
+  setCaseSize("");
+  setPacketSize("");
+  setRetailSize("");
+  setPrice("");
+  setAiel("");
+  setrrp("");
+  setCaseBarcode("");
         toast.success("Product added successfully");
         console.log("success",result)
+        
       }else {
-        alert(`Error: ${result.error}`);
+        toast.warning(`Error: ${result.error}`);
       }
     }catch(error){
       console.error(error);
-      alert("An error occured. Please try again later.");
+      toast.warning("An error occured. Please try again later.");
     }
   }
 
@@ -257,6 +273,8 @@ const employeeId = 3;
       alert(`${updatedProduct.title} price updated to $${updatedProduct.price}`);
     }
   };
+
+
 
   const filteredProducts = products.filter((product) =>
     product.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -337,17 +355,29 @@ const employeeId = 3;
           
 
           {/* Other Fields */}
-         <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-         <Input type="text" placeholder="Case Size" value={caseSize} onChange={(e) => setCaseSize(e.target.value)} />
-         <Input type="text" placeholder="Packet Size" value={packetSize} onChange={(e) => setPacketSize(e.target.value)} />
-         <Input type="text" placeholder="Retail Size" value={retailSize} onChange={(e) => setRetailSize(e.target.value)} />
-         <Input type="number" placeholder="Price" value={price} onChange={(e) => setPrice(e.target.value)} />
-         <Input type="text" placeholder="Aiel no" value={Aiel} onChange={(e) => setAiel(e.target.value)} />
+          <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+         <Input type="text" placeholder="Case Size" value={caseSize} onChange={(e) => setCaseSize(e.target.value)} required />
+         <Input type="text" placeholder="Packet Size" value={packetSize} onChange={(e) => setPacketSize(e.target.value)} required/>
+         <Input type="text" placeholder="Retail Size" value={retailSize} onChange={(e) => setRetailSize(e.target.value)} required/>
+         <Input type="number" placeholder="Price" value={price} onChange={(e) => setPrice(e.target.value)}required/>
+         <Input type="text" placeholder="Aiel no" value={Aiel} onChange={(e) => setAiel(e.target.value)}required />
+         <Input type="text" placeholder="rrp" value={rrp} onChange={(e) => setrrp(e.target.value)}required /> 
 
          {/* Add Product Button */}
-         <Button className="w-full" onClick={handleAddProduct}>
+         
+  {/* Add Product Button */}
+  <Button 
+    className="w-full" 
+    type="submit"
+    disabled={isSubmitting}
+    onClick={handleAddProduct}
+  >
+    {isSubmitting ? "Adding Product..." : "Add Product"}
+  </Button>
+
+         {/* <Button className="w-full" onClick={handleAddProduct}>
           Add Product
-        </Button>
+        </Button> */}
         </div>
       </DialogContent>
           </Dialog>

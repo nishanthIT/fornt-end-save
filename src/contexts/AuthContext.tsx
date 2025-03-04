@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode,useEffect } from "react";
 
 interface User {
   id: number;
@@ -22,6 +22,15 @@ const mockUsers = [
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // Auto-login with admin user
+    const adminUser = mockUsers.find((u) => u.role === "admin");
+    if (adminUser) {
+      const { password: _, email: __, ...userWithoutSensitiveInfo } = adminUser;
+      setUser(userWithoutSensitiveInfo);
+    }
+  }, []);
 
   const login = (email: string, password: string) => {
     const foundUser = mockUsers.find(

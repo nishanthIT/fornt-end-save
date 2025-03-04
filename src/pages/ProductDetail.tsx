@@ -1,8 +1,11 @@
-import { useState } from "react";
+
+
+
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Upload } from "lucide-react";
 import { ShopAvailability } from "@/components/ShopAvailability";
 import {
   Dialog,
@@ -26,38 +29,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
-// Mock shops data
-const mockShops = [
-  {
-    id: 1,
-    name: "Downtown Store",
-    location: "123 Main St, Downtown",
-    price: 299.99,
-    stock: 15,
-  },
-  {
-    id: 2,
-    name: "Uptown Market",
-    location: "456 High St, Uptown",
-    price: 289.99,
-    stock: 8,
-  },
-  {
-    id: 3,
-    name: "West Side Shop",
-    location: "789 West Ave",
-    price: 309.99,
-    stock: 0,
-  },
-];
-
-// Form schema for product editing
+// Form validation schema
 const productSchema = z.object({
-  name: z.string().min(1, "Product name is required"),
+  title: z.string().min(1, "Product name is required"),
   barcode: z.string().min(1, "Barcode is required"),
-  retailSize: z.string().min(1, "Retail size is required"),
-  caseSize: z.string().min(1, "Case size is required"),
-  image: z.string().min(1, "Image URL is required"),
+  retailSize: z.string().min(0, "Retail size is required"),
+  caseSize: z.string().min(0, "Case size is required"),
+  packetSize: z.string().min(0, "Packet size is required"),
+  rrp: z.string().min(0, "rrp is required"),
+  caseBarcode: z.string().min(0, "Case barcode is required"),
 });
 
 const ProductDetail = () => {
@@ -65,81 +45,211 @@ const ProductDetail = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef(null);
 
-  // Mock product data - replace with your actual data fetching logic
-  const [product, setProduct] = useState({
-    id: 1,
-    name: "Premium Wireless Headphones",
-    category: "Electronics",
-    description: "High-quality wireless headphones with noise cancellation and premium sound quality.",
-    price: 299.99,
-    image: "/placeholder.svg",
-    barcode: "123456789",
-    retailSize: "1 unit",
-    caseSize: "12 units",
-    specs: [
-      "Active Noise Cancellation",
-      "40h Battery Life",
-      "Bluetooth 5.0",
-    ],
-  });
+  // Determine if the ID is a barcode or product ID
+  const isBarcode = /^\d+$/.test(id); // Check if the ID is numeric (barcode)
+
+  // Fetch product data
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        setLoading(true);
+        const endpoint = isBarcode
+          ? `http://localhost:3000/api/getProductByBarcode/${id}`
+          : `http://localhost:3000/api/getProductById/${id}`;
+
+        const response = await fetch(endpoint);
+        if (!response.ok) {
+          throw new Error("Failed to fetch product data");
+        }
+
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.error || "Product not found");
+        }
+
+        // Ensure shops is always an array
+        const productData = {
+          ...data.data,
+          shops: data.data.shops ?? [], // Default to an empty array if shops is undefined
+        };
+
+        setProduct(productData);
+      } catch (error) {
+        console.error("Error fetching product:", error);
+        setError(error.message);
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProduct();
+  }, [id, isBarcode, toast]);
 
   const form = useForm({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      name: product.name,
-      barcode: product.barcode,
-      retailSize: product.retailSize,
-      caseSize: product.caseSize,
-      image: product.image,
+      title: product?.title || "",
+      barcode: product?.barcode || "",
+      retailSize: product?.retailSize || "",
+      caseSize: product?.caseSize || "",
+      packetSize: product?.packetSize || "",
+      rrp: product?.rrp || "",
+      caseBarcode: product?.caseBarcode || ""
     },
   });
 
-  const onSubmit = (values: z.infer<typeof productSchema>) => {
-    // Update product data
-    setProduct({
-      ...product,
-      ...values,
-    });
-    
-    toast({
-      title: "Success",
-      description: "Product details updated successfully",
-    });
-    
-    setIsEditing(false);
+  // Reset form values when product data changes
+  useEffect(() => {
+    if (product) {
+      form.reset({
+        title: product.title,
+        barcode: product.barcode,
+        retailSize: product.retailSize,
+        caseSize: product.caseSize,
+        packetSize: product.packetSize,
+        rrp: product.rrp || "",
+        caseBarcode: product.caseBarcode || ""
+      });
+    }
+  }, [product, form]);
+
+  // Handle image selection
+  const handleImageChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedImage(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
+
+  // Trigger file input click
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handle form submission
+  const onSubmit = async (values) => {
+    if (!values.title || !values.barcode) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("title", values.title);
+      formData.append("barcode", values.barcode);
+      formData.append("retailSize", values.retailSize || "");
+      formData.append("caseSize", values.caseSize ||"");
+      formData.append("packetSize", values.packetSize || "");
+      formData.append("rrp", values.rrp || "");
+      formData.append("caseBarcode", values.caseBarcode || "");
+      
+      if (selectedImage) {
+        formData.append("image", selectedImage);
+      }
+
+      const response = await fetch(`http://localhost:3000/api/editProduct/${product.id}`, {
+        method: "PUT",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update product");
+      }
+
+      const updatedData = await response.json();
+
+      // Update local state with new data
+      setProduct({
+        ...product,
+        ...updatedData.data,
+      });
+
+      toast({
+        title: "Success",
+        description: "Product updated successfully",
+      });
+
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error updating product:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update product",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
+
+  if (!product) {
+    return <div>Product not found</div>;
+  }
 
   return (
     <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <Button
-        variant="ghost"
-        className="mb-6"
-        onClick={() => navigate(-1)}
-      >
+      <Button variant="ghost" className="mb-6" onClick={() => navigate(-1)}>
         <ArrowLeft className="mr-2 h-4 w-4" />
         Back to Products
       </Button>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Left Section */}
         <div className="space-y-6">
           <div className="relative h-96">
             <img
-              src={product.image}
-              alt={product.name}
-              className="w-full h-full object-cover rounded-lg shadow-lg"
+              src={product.img?.[0] || null}
+              alt={product.title}
+              className="w-96 h-96 object-cover rounded-lg shadow-lg"
             />
           </div>
 
           <div className="space-y-4">
             <Badge>{product.category}</Badge>
             <div className="flex justify-between items-center">
-              <h1 className="text-4xl font-bold">{product.name}</h1>
+              <h1 className="text-4xl font-bold">{product.title}</h1>
               <Dialog open={isEditing} onOpenChange={setIsEditing}>
                 <DialogTrigger asChild>
                   <Button>Edit Product</Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
+
+                {/* Scrollable Modal */}
+                <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Edit Product Details</DialogTitle>
                     <DialogDescription>
@@ -150,10 +260,10 @@ const ProductDetail = () => {
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                       <FormField
                         control={form.control}
-                        name="name"
+                        name="title"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Product Name</FormLabel>
+                            <FormLabel>Product Name *</FormLabel>
                             <FormControl>
                               <Input {...field} />
                             </FormControl>
@@ -166,7 +276,7 @@ const ProductDetail = () => {
                         name="barcode"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Barcode</FormLabel>
+                            <FormLabel>Barcode *</FormLabel>
                             <FormControl>
                               <Input {...field} />
                             </FormControl>
@@ -176,10 +286,10 @@ const ProductDetail = () => {
                       />
                       <FormField
                         control={form.control}
-                        name="retailSize"
+                        name="caseBarcode"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Retail Size</FormLabel>
+                            <FormLabel>Case Barcode</FormLabel>
                             <FormControl>
                               <Input {...field} />
                             </FormControl>
@@ -187,40 +297,121 @@ const ProductDetail = () => {
                           </FormItem>
                         )}
                       />
-                      <FormField
-                        control={form.control}
-                        name="caseSize"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Case Size</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="image"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Image URL</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <Button type="submit" className="w-full">Save Changes</Button>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="rrp"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>RRP</FormLabel>
+                              <FormControl>
+                                <Input {...field} type="number" step="0.01" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <FormField
+                          control={form.control}
+                          name="caseSize"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Case Size *</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="packetSize"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Packet Size *</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="retailSize"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Retail Size *</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      {/* Image Upload Section */}
+                      <div className="space-y-2">
+                        <FormLabel>Product Image</FormLabel>
+                        <div 
+                          className="flex items-center justify-center border-2 border-dashed border-gray-300 rounded-md p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={handleUploadClick}
+                        >
+                          {imagePreview ? (
+                            <div className="text-center">
+                              <img 
+                                src={imagePreview} 
+                                alt="Preview" 
+                                className="mx-auto max-h-40 object-contain mb-2" 
+                              />
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                type="button"
+                              >
+                                Change Image
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="text-center">
+                              <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                              <p className="mt-1 text-sm text-gray-500">
+                                Tap to upload product image
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                Background will be automatically removed
+                              </p>
+                            </div>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            ref={fileInputRef}
+                            onChange={handleImageChange}
+                          />
+                        </div>
+                      </div>
+
+                      <Button 
+                        type="submit" 
+                        className="w-full"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? "Updating..." : "Save Changes"}
+                      </Button>
                     </form>
                   </Form>
                 </DialogContent>
               </Dialog>
             </div>
             <p className="text-muted-foreground">{product.description}</p>
-            
+
+            {/* Product Details */}
             <div className="space-y-2">
               <h3 className="font-semibold">Product Details:</h3>
               <div className="grid grid-cols-2 gap-4">
@@ -236,13 +427,26 @@ const ProductDetail = () => {
                   <p className="text-sm text-muted-foreground">Case Size</p>
                   <p className="font-medium">{product.caseSize}</p>
                 </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Packet Size</p>
+                  <p className="font-medium">{product.packetSize}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">RRP</p>
+                  <p className="font-medium">{product.rrp}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">CaseBarcode</p>
+                  <p className="font-medium">{product.caseBarcode}</p>
+                </div>
               </div>
             </div>
-            
+
+            {/* Specifications */}
             <div className="space-y-2">
               <h3 className="font-semibold">Specifications:</h3>
               <ul className="list-disc list-inside space-y-1">
-                {product.specs.map((spec, index) => (
+                {product.specs?.map((spec, index) => (
                   <li key={index} className="text-muted-foreground">{spec}</li>
                 ))}
               </ul>
@@ -250,11 +454,12 @@ const ProductDetail = () => {
           </div>
         </div>
 
+        {/* Right Section - Shop Availability */}
         <div className="space-y-6">
           <h2 className="text-2xl font-semibold mb-4">Available at Stores</h2>
           <div className="space-y-4">
-            {mockShops.map((shop) => (
-              <ShopAvailability key={shop.id} shop={shop} />
+            {product.shops?.map((shop) => (
+              <ShopAvailability key={shop.id || shop.name} shop={shop} />
             ))}
           </div>
         </div>
