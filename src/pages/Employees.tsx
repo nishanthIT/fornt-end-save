@@ -69,6 +69,35 @@ const Employees = () => {
     setIsEditing(true);
   };
 
+  const validateEmployeeData = (employee: Omit<Employee, "id">) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^[0-9]{10}$/; // Adjust based on your phone number format
+  
+    if (!employee.name.trim()) {
+      toast.error("Name is required");
+      return false;
+    }
+  
+    if (!emailRegex.test(employee.email)) {
+      toast.error("Invalid email format");
+      return false;
+    }
+  
+    if (!phoneRegex.test(employee.phoneNo)) {
+      toast.error("Invalid phone number");
+      return false;
+    }
+  
+    if (employee.password.length < 8) {
+      toast.error("Password must be at least 8 characters long");
+      return false;
+    }
+  
+    return true;
+  };
+
+
+
   const handleDelete = async (id) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this employee?");
     if (confirmDelete) {
@@ -463,7 +492,7 @@ if(loading) {
         <label className="text-sm font-medium">Password</label>
         <Input
           type="password"
-          value={editingEmployee?.password || ''}
+         // value={editingEmployee?.password || ''}
           onChange={(e) =>
             setEditingEmployee({
               ...editingEmployee,

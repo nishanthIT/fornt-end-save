@@ -30,12 +30,13 @@ export const AddShopDialog = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
+    const authToken = localStorage.getItem("auth_token");
     try {
       const response = await fetch("http://localhost:3000/api/addShop", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(authToken && { Authorization: `Bearer ${authToken}` })
         },
         body: JSON.stringify({
           name: formData.name,
