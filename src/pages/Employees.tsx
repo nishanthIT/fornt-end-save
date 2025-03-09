@@ -103,8 +103,15 @@ const Employees = () => {
     if (confirmDelete) {
       try {
         // Send a DELETE request to the server
+        const authToken = localStorage.getItem("auth_token");
         await fetch(`http://localhost:3000/api/deleteEmployee/${id}`, {
           method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken && { Authorization: `Bearer ${authToken}` }),
+
+          },
+           credentials: 'include'
         });
   
         // Update the state to remove the deleted employee from the UI
@@ -138,12 +145,15 @@ const Employees = () => {
 
   const handleSave = async () => {
     try {
+      const authToken = localStorage.getItem("auth_token");
       const response = await fetch(`http://localhost:3000/api/updateEmployee/${editingEmployee.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...(authToken && { Authorization: `Bearer ${authToken}` }),
         },
         body: JSON.stringify(editingEmployee),
+         credentials: 'include'
       });
   
       if (response.ok) {
@@ -170,10 +180,12 @@ const Employees = () => {
 
   const handleAdd = async () => {
     try {
+      const authToken = localStorage.getItem("auth_token");
       const response = await fetch(' http://localhost:3000/api/addEmployee', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(authToken && { Authorization: `Bearer ${authToken}` }),
         },
         body: JSON.stringify({
           name: newEmployee.name,
@@ -181,6 +193,7 @@ const Employees = () => {
           email: newEmployee.email,
           password: newEmployee.password,
         }),
+         credentials: 'include'
       });
   
       if (response.ok) {

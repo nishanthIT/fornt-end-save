@@ -10,7 +10,15 @@ const useFetchShopById = (shopId: string) => {
     const fetchShop = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:3000/api/getshop/${shopId}`);
+        const auth_token =  localStorage.getItem('auth_token');
+        const response = await fetch(`http://localhost:3000/api/getshop/${shopId}`,{
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(auth_token && { Authorization: `Bearer ${auth_token}` }),
+          },
+           credentials: 'include'
+        });
         if (!response.ok) {
           throw new Error(`Failed to fetch shop with ID: ${shopId}`);
         }

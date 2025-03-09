@@ -43,6 +43,7 @@ export const AddShopDialog = ({
           address: formData.address,
           mobile: formData.phone,
         }),
+         credentials: 'include'
       });
 
       if (response.ok) {

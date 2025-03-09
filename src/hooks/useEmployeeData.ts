@@ -27,8 +27,16 @@ const useEmployeeData = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      const authToken = localStorage.getItem("auth_token");
       try {
-        const response = await fetch("http://localhost:3000/api/getallemploy");
+        const response = await fetch("http://localhost:3000/api/getallemploy",{
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken && { Authorization: `Bearer ${authToken}` }),
+          },
+           credentials: 'include'
+        });
         const data = await response.json();
 
         // Process the fetched data

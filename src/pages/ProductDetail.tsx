@@ -31,13 +31,13 @@ import * as z from "zod";
 
 // Form validation schema
 const productSchema = z.object({
-  title: z.string().min(1, "Product name is required"),
-  barcode: z.string().min(1, "Barcode is required"),
-  retailSize: z.string().min(0, "Retail size is required"),
-  caseSize: z.string().min(0, "Case size is required"),
-  packetSize: z.string().min(0, "Packet size is required"),
-  rrp: z.string().min(0, "rrp is required"),
-  caseBarcode: z.string().min(0, "Case barcode is required"),
+  title: z.string(),
+  barcode: z.string(),
+  retailSize: z.string().optional(),
+  caseSize: z.string().optional(),
+  packetSize: z.string().optional(),
+  rrp: z.string().optional(),
+  caseBarcode: z.string().optional(),
 });
 
 const ProductDetail = () => {
@@ -65,7 +65,16 @@ const ProductDetail = () => {
           ? `http://localhost:3000/api/getProductByBarcode/${id}`
           : `http://localhost:3000/api/getProductById/${id}`;
 
-        const response = await fetch(endpoint);
+          const authToken = localStorage.getItem("auth_token");
+        const response = await fetch(endpoint,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              ...(authToken && { Authorization: `Bearer ${authToken}` }),
+            },
+            credentials: 'include'
+          });
         if (!response.ok) {
           throw new Error("Failed to fetch product data");
         }
@@ -98,6 +107,7 @@ const ProductDetail = () => {
     fetchProduct();
   }, [id, isBarcode, toast]);
 
+  console.log(product);
   const form = useForm({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -117,9 +127,9 @@ const ProductDetail = () => {
       form.reset({
         title: product.title,
         barcode: product.barcode,
-        retailSize: product.retailSize,
-        caseSize: product.caseSize,
-        packetSize: product.packetSize,
+        retailSize: product.retailSize || "",
+        caseSize: product.caseSize  || "",
+        packetSize: product.packetSize || "",
         rrp: product.rrp || "",
         caseBarcode: product.caseBarcode || ""
       });
@@ -172,10 +182,14 @@ const ProductDetail = () => {
       if (selectedImage) {
         formData.append("image", selectedImage);
       }
+      const authToken = localStorage.getItem("auth_token");
 
       const response = await fetch(`http://localhost:3000/api/editProduct/${product.id}`, {
         method: "PUT",
         body: formData,
+        headers: {
+          ...(authToken && { Authorization: `Bearer ${authToken}` }),
+        },
       });
 
       if (!response.ok) {
