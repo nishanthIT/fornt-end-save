@@ -75,7 +75,7 @@ export const ProductCardshop = ({
     const authToken = localStorage.getItem("auth_token");
     try {
       setUploading(true);
-      const response = await fetch('http://localhost:3000/api/addProductAtShopifExistAtProduct', {
+      const response = await fetch('https://backend.h7tex.com/api/addProductAtShopifExistAtProduct', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

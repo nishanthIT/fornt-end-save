@@ -118,7 +118,7 @@ const ShopDetail = () => {
     try {
       setIsSubmitting(true);
       const authToken = localStorage.getItem("auth_token");
-      const response = await fetch("http://localhost:3000/api/addProductAtShop", {
+      const response = await fetch("https://backend.h7tex.com/api/addProductAtShop", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -193,7 +193,7 @@ const ShopDetail = () => {
       };
       const authToken = localStorage.getItem("auth_token");
 
-      const response = await fetch("http://localhost:3000/api/addProductAtShopifExistAtProduct", {
+      const response = await fetch("https://backend.h7tex.com/api/addProductAtShopifExistAtProduct", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -239,7 +239,7 @@ const ShopDetail = () => {
     const authToken = localStorage.getItem("auth_token");
     
     try {
-      const response = await fetch(`http://localhost:3000/api/shop/${id}/updateProductPrice`, {
+      const response = await fetch(`https://backend.h7tex.com/api/shop/${id}/updateProductPrice`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

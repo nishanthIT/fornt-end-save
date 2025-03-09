@@ -79,7 +79,7 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-       // const response = await fetch('http://localhost:3000/api/admin/dashboard/overview');
+       // const response = await fetch('https://backend.h7tex.com/api/admin/dashboard/overview');
        
         const result = await api.get('/admin/dashboard/overview');
         

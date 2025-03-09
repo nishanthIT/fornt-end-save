@@ -32,7 +32,7 @@ export const AddShopDialog = ({
     setLoading(true);
     const authToken = localStorage.getItem("auth_token");
     try {
-      const response = await fetch("http://localhost:3000/api/addShop", {
+      const response = await fetch("https://backend.h7tex.com/api/addShop", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

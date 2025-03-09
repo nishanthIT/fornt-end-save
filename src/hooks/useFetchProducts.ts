@@ -38,10 +38,10 @@ const useFetchProducts = (searchQuery, filters = {}, page = 1, limit = 10) => {
         params.append('limit', limit.toString());
         
         // For debugging
-        // console.log(`Fetching from: http://localhost:3000/api/filterProducts?${params.toString()}`);
+        // console.log(`Fetching from: https://backend.h7tex.com/api/filterProducts?${params.toString()}`);
         
         const auth_token = localStorage.getItem('auth_token');
-        const response = await fetch(`http://localhost:3000/api/filterProducts?${params.toString()}`,{
+        const response = await fetch(`https://backend.h7tex.com/api/filterProducts?${params.toString()}`,{
           method: "GET",
           headers: {
             "Content-Type": "application/json",

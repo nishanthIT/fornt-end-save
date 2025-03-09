@@ -36,7 +36,7 @@ export const ShopCard = ({ shop, onClick, onDelete, onUpdate }: ShopCardProps) =
 const authToken = localStorage.getItem("auth_token");
   const handleSave = async () => {
     try {
-      const response = await fetch(`http://localhost:3000/api/editShop/${shop.id}`, {
+      const response = await fetch(`https://backend.h7tex.com/api/editShop/${shop.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

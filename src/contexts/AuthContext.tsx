@@ -22,7 +22,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Configure axios
-axios.defaults.baseURL = "http://localhost:3000/api";
+axios.defaults.baseURL = "https://backend.h7tex.com/api";
 axios.defaults.withCredentials = true;
 
 // Add request interceptor to include token in Authorization header

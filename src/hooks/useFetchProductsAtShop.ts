@@ -15,7 +15,7 @@ const useFetchProductsAtShop = (shopId, refreshTrigger = 0) => {
     try {
       setLoading(true);
       const auth_token = localStorage.getItem('auth_token');
-      const response = await fetch(`http://localhost:3000/api/shop/${shopId}/products`,{
+      const response = await fetch(`https://backend.h7tex.com/api/shop/${shopId}/products`,{
         method: "GET",
         headers: {
           "Content-Type": "application/json",

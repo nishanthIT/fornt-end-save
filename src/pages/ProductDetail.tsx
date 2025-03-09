@@ -62,8 +62,8 @@ const ProductDetail = () => {
       try {
         setLoading(true);
         const endpoint = isBarcode
-          ? `http://localhost:3000/api/getProductByBarcode/${id}`
-          : `http://localhost:3000/api/getProductById/${id}`;
+          ? `https://backend.h7tex.com/api/getProductByBarcode/${id}`
+          : `https://backend.h7tex.com/api/getProductById/${id}`;
 
           const authToken = localStorage.getItem("auth_token");
         const response = await fetch(endpoint,
@@ -184,12 +184,13 @@ const ProductDetail = () => {
       }
       const authToken = localStorage.getItem("auth_token");
 
-      const response = await fetch(`http://localhost:3000/api/editProduct/${product.id}`, {
+      const response = await fetch(`https://backend.h7tex.com/api/editProduct/${product.id}`, {
         method: "PUT",
         body: formData,
         headers: {
           ...(authToken && { Authorization: `Bearer ${authToken}` }),
         },
+         credentials: 'include'
       });
 
       if (!response.ok) {

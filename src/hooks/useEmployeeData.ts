@@ -29,7 +29,7 @@ const useEmployeeData = () => {
     const fetchData = async () => {
       const authToken = localStorage.getItem("auth_token");
       try {
-        const response = await fetch("http://localhost:3000/api/getallemploy",{
+        const response = await fetch("https://backend.h7tex.com/api/getallemploy",{
           method: "GET",
           headers: {
             "Content-Type": "application/json",
