@@ -65,7 +65,7 @@ const ProductDetail = () => {
           ? `https://backend.h7tex.com/api/getProductByBarcode/${id}`
           : `https://backend.h7tex.com/api/getProductById/${id}`;
 
-          const authToken = localStorage.getItem("auth_token");
+        const authToken = localStorage.getItem("auth_token");
         const response = await fetch(endpoint,
           {
             method: "GET",
@@ -128,7 +128,7 @@ const ProductDetail = () => {
         title: product.title,
         barcode: product.barcode,
         retailSize: product.retailSize || "",
-        caseSize: product.caseSize  || "",
+        caseSize: product.caseSize || "",
         packetSize: product.packetSize || "",
         rrp: product.rrp || "",
         caseBarcode: product.caseBarcode || ""
@@ -141,7 +141,7 @@ const ProductDetail = () => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedImage(file);
-      
+
       // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -174,11 +174,11 @@ const ProductDetail = () => {
       formData.append("title", values.title);
       formData.append("barcode", values.barcode);
       formData.append("retailSize", values.retailSize || "");
-      formData.append("caseSize", values.caseSize ||"");
+      formData.append("caseSize", values.caseSize || "");
       formData.append("packetSize", values.packetSize || "");
       formData.append("rrp", values.rrp || "");
       formData.append("caseBarcode", values.caseBarcode || "");
-      
+
       if (selectedImage) {
         formData.append("image", selectedImage);
       }
@@ -190,7 +190,7 @@ const ProductDetail = () => {
         headers: {
           ...(authToken && { Authorization: `Bearer ${authToken}` }),
         },
-         credentials: 'include'
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -248,7 +248,8 @@ const ProductDetail = () => {
         <div className="space-y-6">
           <div className="relative h-96">
             <img
-              src={product.img?.[0] || null}
+              // src={product.img?.[0] || null}
+              src={product.img ? (Array.isArray(product.img) ? product.img[0] : product.img) : null}
               alt={product.title}
               className="w-96 h-96 object-cover rounded-lg shadow-lg"
             />
@@ -372,20 +373,20 @@ const ProductDetail = () => {
                       {/* Image Upload Section */}
                       <div className="space-y-2">
                         <FormLabel>Product Image</FormLabel>
-                        <div 
+                        <div
                           className="flex items-center justify-center border-2 border-dashed border-gray-300 rounded-md p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                           onClick={handleUploadClick}
                         >
                           {imagePreview ? (
                             <div className="text-center">
-                              <img 
-                                src={imagePreview} 
-                                alt="Preview" 
-                                className="mx-auto max-h-40 object-contain mb-2" 
+                              <img
+                                src={imagePreview}
+                                alt="Preview"
+                                className="mx-auto max-h-40 object-contain mb-2"
                               />
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 type="button"
                               >
                                 Change Image
@@ -412,8 +413,8 @@ const ProductDetail = () => {
                         </div>
                       </div>
 
-                      <Button 
-                        type="submit" 
+                      <Button
+                        type="submit"
                         className="w-full"
                         disabled={isSubmitting}
                       >
