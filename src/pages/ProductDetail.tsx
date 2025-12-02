@@ -61,9 +61,10 @@ const ProductDetail = () => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
         const endpoint = isBarcode
-          ? `https://backend.h7tex.com/api/getProductByBarcode/${id}`
-          : `https://backend.h7tex.com/api/getProductById/${id}`;
+          ? `${baseUrl}/getProductByBarcode/${id}`
+          : `${baseUrl}/getProductById/${id}`;
 
         const authToken = localStorage.getItem("auth_token");
         const response = await fetch(endpoint,
@@ -184,7 +185,7 @@ const ProductDetail = () => {
       }
       const authToken = localStorage.getItem("auth_token");
 
-      const response = await fetch(`https://backend.h7tex.com/api/editProduct/${product.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/editProduct/${product.id}`, {
         method: "PUT",
         body: formData,
         headers: {

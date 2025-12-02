@@ -79,8 +79,7 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-       // const response = await fetch('https://backend.h7tex.com/api/admin/dashboard/overview');
-       
+        // Using the API instance instead of hardcoded URL
         const result = await api.get('/admin/dashboard/overview');
         
         if (result.data.success) {

@@ -9,6 +9,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Store, Phone, MapPin, Plus, Save, PlusCircle, Barcode, Search, Camera, Upload } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductCardshop } from "@/components/ProductCardShop";
+import { ProductAtShopCard } from "@/components/ProductAtShopCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import useFetchProducts from "@/hooks/useFetchProducts";
@@ -118,7 +119,7 @@ const ShopDetail = () => {
     try {
       setIsSubmitting(true);
       const authToken = localStorage.getItem("auth_token");
-      const response = await fetch("https://backend.h7tex.com/api/addProductAtShop", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addProductAtShop`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -193,7 +194,7 @@ const ShopDetail = () => {
       };
       const authToken = localStorage.getItem("auth_token");
 
-      const response = await fetch("https://backend.h7tex.com/api/addProductAtShopifExistAtProduct", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addProductAtShopifExistAtProduct`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -223,23 +224,11 @@ const ShopDetail = () => {
     }
   };
 
-  const handlePriceChange = (productId, newPrice) => {
-    setProducts((prev) =>
-      prev.map((product) =>
-        product.productId === productId
-          ? { ...product, price: parseFloat(newPrice) || 0 }
-          : product
-      )
-    );
-  };
-
-  const handleSavePrice = async (productId) => {
-    const updatedProduct = products.find((product) => product.productId === productId);
-    if (!updatedProduct) return;
+  const handleSavePrice = async (productId, newPrice, offerPrice = null, offerExpiryDate = null) => {
     const authToken = localStorage.getItem("auth_token");
     
     try {
-      const response = await fetch(`https://backend.h7tex.com/api/shop/${id}/updateProductPrice`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${id}/updateProductPrice`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -247,7 +236,9 @@ const ShopDetail = () => {
         },
         body: JSON.stringify({
           productId,
-          price: updatedProduct.price,
+          price: newPrice,
+          offerPrice,
+          offerExpiryDate,
           employeeId,
         }),
          credentials: 'include'
@@ -256,9 +247,11 @@ const ShopDetail = () => {
       const result = await response.json();
 
       if (response.ok) {
-        toast.success(`${updatedProduct.title} price updated to $${updatedProduct.price}`);
+        const product = products.find(p => p.productId === productId);
+        toast.success(`${product?.title || 'Product'} updated successfully`);
         // Refresh products after price update
         setRefreshTrigger(prev => prev + 1);
+        await refetchProductsAtShop();
       } else {
         toast.warning(`Error: ${result.error}`);
       }
@@ -266,6 +259,15 @@ const ShopDetail = () => {
       console.error(error);
       toast.warning("An error occurred. Please try again later.");
     }
+  };
+
+  const handlePriceUpdate = (productId, newPrice) => {
+    handleSavePrice(productId, newPrice);
+  };
+
+  const handleOfferUpdate = (productId, regularPrice, offerPrice, offerExpiryDate) => {
+    // Use the provided regular price instead of the old product.price
+    handleSavePrice(productId, regularPrice, offerPrice, offerExpiryDate);
   };
 
   const filteredProducts = products && products.length > 0
@@ -465,43 +467,25 @@ const ShopDetail = () => {
             <div className="space-y-4">
               {filteredProducts.length > 0 ? (
                 filteredProducts.map((product) => (
-                  <div
+                  <ProductAtShopCard
                     key={product.productId}
-                    className="flex items-center justify-between p-4 border rounded-lg space-x-4"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <img
-                        src={product.img && product.img[0] ? product.img[0] : fallbackImg}
-                        alt={product.title}
-                        className="w-16 h-16 object-cover rounded-md flex-shrink-0"
-                        loading="lazy"
-                      />
-                      <div>
-                        <h3 className="text-lg font-semibold">{product.title}</h3>
-                        <div className="text-sm text-gray-500">
-                          <span>Case: {product.caseSize || "N/A"}</span> | 
-                          <span>Packet: {product.packetSize || "N/A"}</span> | 
-                          <span>Retail: {product.retailSize || "N/A"}</span> | 
-                          <span>AIEL: {product.aiel || "N/A"}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        type="number"
-                        value={product.price}
-                        onChange={(e) => handlePriceChange(product.productId, e.target.value)}
-                        className="w-24"
-                      />
-                      <Button
-                        onClick={() => handleSavePrice(product.productId)}
-                        size="sm"
-                        className="flex items-center justify-center"
-                      >
-                        <Save className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                    productId={product.productId}
+                    shopId={product.shopId}
+                    title={product.title}
+                    caseSize={product.caseSize}
+                    packetSize={product.packetSize}
+                    retailSize={product.retailSize}
+                    barcode={product.barcode}
+                    caseBarcode={product.caseBarcode}
+                    img={product.img}
+                    price={Number(product.price)}
+                    offerPrice={product.offerPrice ? Number(product.offerPrice) : undefined}
+                    offerExpiryDate={product.offerExpiryDate}
+                    aiel={product.aiel}
+                    rrp={Number(product.rrp)}
+                    onPriceUpdate={handlePriceUpdate}
+                    onOfferUpdate={handleOfferUpdate}
+                  />
                 ))
               ) : (
                 <div>No products found. {products && products.length > 0 ? `Found ${products.length} products total, but none match the current search.` : "No products available in this shop yet."}</div>

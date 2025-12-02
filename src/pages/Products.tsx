@@ -202,7 +202,7 @@ const Products = () => {
         formData.append("image", selectedImage);
       }
       const authToken = localStorage.getItem("auth_token");
-      const response = await fetch("https://backend.h7tex.com/api/addproduct", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addproduct`, {
         method: "POST",
         body: formData,
         headers: {

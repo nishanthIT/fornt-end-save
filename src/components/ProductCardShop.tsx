@@ -21,6 +21,9 @@ interface ProductCardProps {
   retailSize: string;
   availability?: number;
   onClick?: () => void;
+  price?: number;
+  offerPrice?: number;
+  offerExpiryDate?: string;
 }
 
 export const ProductCardshop = ({
@@ -34,6 +37,9 @@ export const ProductCardshop = ({
   retailSize,
   availability = 1,
   onClick,
+  price,
+  offerPrice,
+  offerExpiryDate,
 }: ProductCardProps) => {
   const navigate = useNavigate();
   const { id: shopId } = useParams();
@@ -41,9 +47,11 @@ export const ProductCardshop = ({
   const isInShopDetail = location.pathname.includes("/shop/");
   const [open, setOpen] = useState(false);
   const [barcodeValue, setBarcodeValue] = useState(""); 
-  const [price, setPrice] = useState("");
+  const [priceInput, setPriceInput] = useState("");
   const [aiel, setaiel] = useState("");
   const [rrp, setRrp] = useState("");
+  const [offerPriceValue, setOfferPriceValue] = useState("");
+  const [offerExpiryDateValue, setOfferExpiryDateValue] = useState("");
   const [uploading, setUploading] = useState(false);
 
   const handleEdit = (e: React.MouseEvent) => {
@@ -64,18 +72,20 @@ export const ProductCardshop = ({
   const handleSubmit = async () => {
     const prd_details = {
       casebarcode: barcodeValue,
-      price,
+      price: priceInput,
       aiel,
       shopId,
       employeeId,
       id,
-      rrp
+      rrp,
+      offerPrice: offerPriceValue,
+      offerExpiryDate: offerExpiryDateValue
     };
 
     const authToken = localStorage.getItem("auth_token");
     try {
       setUploading(true);
-      const response = await fetch('https://backend.h7tex.com/api/addProductAtShopifExistAtProduct', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addProductAtShopifExistAtProduct`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -93,9 +103,11 @@ export const ProductCardshop = ({
         toast.success("Product added successfully");
      
         setBarcodeValue("")
-        setPrice("")
+        setPriceInput("")
         setaiel("")
         setRrp("")
+        setOfferPriceValue("")
+        setOfferExpiryDateValue("")
 
         
       } else {
@@ -174,8 +186,8 @@ export const ProductCardshop = ({
               <Input
                 type="number"
                 placeholder="Enter Price"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                value={priceInput}
+                onChange={(e) => setPriceInput(e.target.value)}
               />
               
               {/* Aisle Number Input */}
@@ -192,6 +204,22 @@ export const ProductCardshop = ({
                 placeholder="Enter RRP"
                 value={rrp}
                 onChange={(e) => setRrp(e.target.value)}
+              />
+              
+              {/* Offer Price Input */}
+              <Input
+                type="number"
+                placeholder="Enter Offer Price (optional)"
+                value={offerPriceValue}
+                onChange={(e) => setOfferPriceValue(e.target.value)}
+              />
+              
+              {/* Offer Expiry Date Input */}
+              <Input
+                type="datetime-local"
+                placeholder="Offer Expiry Date"
+                value={offerExpiryDateValue}
+                onChange={(e) => setOfferExpiryDateValue(e.target.value)}
               />
             </div>
           </ScrollArea>

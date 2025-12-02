@@ -132,6 +132,9 @@ import EditProductPrice from "./pages/EditProductPrice";
 import AddProduct from "./pages/AddProduct";
 import Customers from "./pages/Customers";
 import Employees from "./pages/Employees";
+import Chat from "./pages/Chat";
+import PriceCorrections from "./pages/PriceCorrections";
+import PromotionManagement from "./pages/PromotionManagement";
 
 const queryClient = new QueryClient();
 
@@ -165,7 +168,8 @@ const App = () => (
           <BrowserRouter>
             <div className="min-h-screen">
               <Navbar />
-              <Routes>
+              <main className="pt-16">
+                <Routes>
                 <Route path="/login" element={<Login />} />
                 
                 {/* Admin Routes */}
@@ -182,6 +186,16 @@ const App = () => (
                 <Route path="/employees" element={
                   <ProtectedRoute allowedRoles={["ADMIN"]}>
                     <Employees />
+                  </ProtectedRoute>
+                } />
+                <Route path="/price-corrections" element={
+                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE"]}>
+                    <PriceCorrections />
+                  </ProtectedRoute>
+                } />
+                <Route path="/promotions" element={
+                  <ProtectedRoute allowedRoles={["ADMIN"]}>
+                    <PromotionManagement />
                   </ProtectedRoute>
                 } />
 
@@ -224,6 +238,18 @@ const App = () => (
                   </ProtectedRoute>
                 } />
 
+                {/* Chat Routes */}
+                <Route path="/chat" element={
+                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE", "CUSTOMER"]}>
+                    <Chat />
+                  </ProtectedRoute>
+                } />
+                <Route path="/chat/:chatId" element={
+                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE", "CUSTOMER"]}>
+                    <Chat />
+                  </ProtectedRoute>
+                } />
+
                 {/* Add a customer dashboard route if needed */}
                 {/* <Route path="/customer-dashboard" element={
                   <ProtectedRoute allowedRoles={["CUSTOMER"]}>
@@ -231,6 +257,7 @@ const App = () => (
                   </ProtectedRoute>
                 } /> */}
               </Routes>
+              </main>
             </div>
           </BrowserRouter>
         </TooltipProvider>

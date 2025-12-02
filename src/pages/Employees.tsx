@@ -104,7 +104,7 @@ const Employees = () => {
       try {
         // Send a DELETE request to the server
         const authToken = localStorage.getItem("auth_token");
-        await fetch(`https://backend.h7tex.com/api/deleteEmployee/${id}`, {
+        await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/deleteEmployee/${id}`, {
           method: "DELETE",
           headers: {
             "Content-Type": "application/json",
@@ -146,7 +146,7 @@ const Employees = () => {
   const handleSave = async () => {
     try {
       const authToken = localStorage.getItem("auth_token");
-      const response = await fetch(`https://backend.h7tex.com/api/updateEmployee/${editingEmployee.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/updateEmployee/${editingEmployee.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -181,7 +181,7 @@ const Employees = () => {
   const handleAdd = async () => {
     try {
       const authToken = localStorage.getItem("auth_token");
-      const response = await fetch(' https://backend.h7tex.com/api/addEmployee', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addEmployee`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

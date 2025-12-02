@@ -9,7 +9,7 @@ const useFetchShops = () => {
     const fetchShops = async () => {
       try {
         const authToken = localStorage.getItem("auth_token");
-        const response = await fetch("https://backend.h7tex.com/api/getAllshop",{
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/getAllshop`,{
           method: "GET",
           headers: {
             "Content-Type": "application/json",

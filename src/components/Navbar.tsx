@@ -105,7 +105,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Grid, Box, Users, Store, Menu, UserCircle, LogOut } from "lucide-react";
+import { Grid, Box, Users, Store, Menu, UserCircle, LogOut, AlertTriangle, Image } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const Navbar = () => {
@@ -122,12 +122,15 @@ export const Navbar = () => {
     { icon: Store, label: "Shops", path: "/shops" },
     { icon: Users, label: "Customers", path: "/customers" },
     { icon: UserCircle, label: "Employees", path: "/employees" },
+    { icon: AlertTriangle, label: "Price Corrections", path: "/price-corrections" },
+    { icon: Image, label: "Promotions", path: "/promotions" },
   ];
 
   const employeeNavItems = [
     { icon: Grid, label: "Dashboard", path: "/employee-dashboard" },
     { icon: Box, label: "Products", path: "/products" },
     { icon: Store, label: "Shops", path: "/shops" },
+    { icon: AlertTriangle, label: "Price Corrections", path: "/price-corrections" },
   ];
 
   // Fix: Check userType instead of role - use lowercase 'admin' to match how your component is checking
@@ -157,8 +160,8 @@ export const Navbar = () => {
   if (!user) return null;
 
   return (
-    <nav className="border-b dark:border-gray-800">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+    <nav className="fixed top-0 left-0 right-0 bg-white dark:bg-gray-900 border-b dark:border-gray-800 z-50">
+      <div className="container flex items-center justify-between">
         {/* Fix: Use userType instead of role */}
         <Link to={user.userType === "ADMIN" ? "/" : "/employee-dashboard"} className="text-xl font-bold">
           {user.userType === "ADMIN" ? "Admin Dashboard" : "Employee Dashboard"}
@@ -177,15 +180,13 @@ export const Navbar = () => {
 
           {/* Mobile Navigation */}
           <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild className="md:hidden">
+            {/* <SheetTrigger asChild className="md:hidden">
               <Button variant="ghost" size="icon">
                 <Menu className="h-6 w-6" />
               </Button>
-            </SheetTrigger>
+            </SheetTrigger> */}
             <SheetContent>
-              <div className="mt-6">
                 <NavContent />
-              </div>
             </SheetContent>
           </Sheet>
         </div>

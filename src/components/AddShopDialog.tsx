@@ -32,7 +32,7 @@ export const AddShopDialog = ({
     setLoading(true);
     const authToken = localStorage.getItem("auth_token");
     try {
-      const response = await fetch("https://backend.h7tex.com/api/addShop", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addShop`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
