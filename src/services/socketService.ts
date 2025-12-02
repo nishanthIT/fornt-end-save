@@ -4,7 +4,7 @@ class SocketService {
   private socket: Socket | null = null;
   private isConnected = false;
 
-  connect(serverUrl: string = 'http://localhost:3000') {
+  connect(serverUrl: string = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:3000') {
     if (this.socket?.connected) {
       return;
     }

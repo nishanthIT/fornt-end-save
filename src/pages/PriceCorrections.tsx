@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle, XCircle, Clock, User, Package, Store, Phone, Calendar, ArrowRight, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { API_CONFIG } from "@/config/api";
 
 interface PriceReport {
   id: string;
@@ -58,7 +59,7 @@ const PriceCorrections: React.FC = () => {
   const [selectedReport, setSelectedReport] = useState<PriceReport | null>(null);
   const [adminNotes, setAdminNotes] = useState('');
 
-  const API_BASE = 'http://localhost:3000/api';
+  const API_BASE = API_CONFIG.BASE_URL;
   const token = localStorage.getItem('auth_token');
 
   useEffect(() => {

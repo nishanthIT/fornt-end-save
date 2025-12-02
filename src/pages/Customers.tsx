@@ -14,6 +14,7 @@ import {
 import { Edit, User, Plus, Trash2, Clock, Calendar, TrendingUp, Info } from "lucide-react";
 import { toast } from "sonner";
 import SubscriptionInfoCard from "@/components/SubscriptionInfoCard";
+import { API_CONFIG, getAdminUrl, getAuthUrl } from "@/config/api";
 
 interface SubscriptionDetails {
   status: string;
@@ -72,7 +73,7 @@ const Customers = () => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/admin/customers');
+      const response = await fetch(getAdminUrl(API_CONFIG.ADMIN.CUSTOMERS));
       const data: ApiResponse = await response.json();
       
       if (data.success) {
@@ -117,7 +118,7 @@ const Customers = () => {
 
   const handleUpgradeCustomer = async (customerId: number) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/customers/${customerId}/subscription`, {
+      const response = await fetch(getAdminUrl(API_CONFIG.ADMIN.CUSTOMER_SUBSCRIPTION(customerId)), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -142,7 +143,7 @@ const Customers = () => {
 
   const handleExtendTrial = async (customerId: number) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/customers/${customerId}/subscription`, {
+      const response = await fetch(getAdminUrl(API_CONFIG.ADMIN.CUSTOMER_SUBSCRIPTION(customerId)), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -167,7 +168,7 @@ const Customers = () => {
 
   const processExpiredTrials = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/admin/process-expired-trials', {
+      const response = await fetch(getAdminUrl(API_CONFIG.ADMIN.PROCESS_EXPIRED_TRIALS), {
         method: 'POST',
       });
 
@@ -192,7 +193,7 @@ const Customers = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/register', {
+      const response = await fetch(getAuthUrl(API_CONFIG.AUTH.REGISTER), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

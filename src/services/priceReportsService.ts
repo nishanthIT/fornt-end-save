@@ -1,4 +1,6 @@
-const API_BASE = 'http://localhost:3000/api';
+import { API_CONFIG } from '@/config/api';
+
+const API_BASE = API_CONFIG.BASE_URL;
 
 export interface PriceReport {
   id: string;
