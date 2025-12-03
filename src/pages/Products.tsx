@@ -238,12 +238,12 @@ const Products = () => {
   };
 
   return (
-    <div className="container py-4 md:py-8 mx-auto px-4">
+    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl md:text-4xl font-bold mb-1 md:mb-2">Products</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2 text-gray-900 dark:text-white">Products</h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Browse and manage your product inventory
             </p>
           </div>

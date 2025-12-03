@@ -52,23 +52,35 @@ const Shops = () => {
 
 
   if (loading) {
-    return <div className="text-center">Loading shops...</div>;
+    return (
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg text-gray-600 dark:text-gray-400">Loading shops...</div>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="text-center text-red-500">Error: {error}</div>;
+    return (
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg text-red-500">Error: {error}</div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Shops</h1>
-        <Button onClick={() => setIsAddShopOpen(true)}>
+    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Shops</h1>
+        <Button onClick={() => setIsAddShopOpen(true)} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" /> Add Shop
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {shops.map((shop) => (
           <ShopCard
             key={shop.id}

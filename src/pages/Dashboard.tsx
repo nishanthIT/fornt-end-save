@@ -115,28 +115,28 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="container py-8">
-      <h1 className="text-3xl font-bold mb-8">Dashboard Overview</h1>
+    <div className="max-w-7xl mx-auto py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-gray-900 dark:text-white">Dashboard Overview</h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {dashboardData.stats.map((stat) => (
-          <Card key={stat.label} className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-primary/10 rounded-full">
-                <stat.icon className="h-6 w-6 text-primary" />
+          <Card key={stat.label} className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-200">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-primary/10 rounded-full">
+                <stat.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-                <p className="text-2xl font-bold">{stat.value}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{stat.label}</p>
+                <p className="text-xl sm:text-2xl font-bold">{stat.value}</p>
               </div>
             </div>
           </Card>
         ))}
       </div>
       
-      <Card className="p-6">
-        <h2 className="text-xl font-semibold mb-4">Monthly Earnings</h2>
-        <div className="h-[300px]">
+      <Card className="p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl font-semibold mb-4 text-gray-900 dark:text-white">Monthly Earnings</h2>
+        <div className="h-[250px] sm:h-[300px]">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <p>Loading chart data...</p>

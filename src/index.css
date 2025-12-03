@@ -51,3 +51,62 @@
 .slide-in {
   @apply animate-slideIn;
 }
+
+/* Mobile drawer navigation - always black for visibility */
+.navbar-responsive-text {
+  color: #000000 !important; /* black for mobile drawer */
+}
+
+.navbar-responsive-text:hover {
+  color: #333333 !important; /* darker black on hover for mobile */
+}
+
+/* Desktop/PC view navigation - white text */
+@media (min-width: 1024px) {
+  .hidden.lg\\:flex .navbar-responsive-text {
+    color: #ffffff !important; /* white for desktop navigation only */
+  }
+  
+  .hidden.lg\\:flex .navbar-responsive-text:hover {
+    color: #e5e7eb !important; /* light gray on hover for desktop */
+  }
+}
+
+/* Force mobile sheet content to stay black */
+[role="dialog"] .navbar-responsive-text {
+  color: #000000 !important; /* force black in mobile drawer */
+}
+
+[role="dialog"] .navbar-responsive-text:hover {
+  color: #333333 !important; /* darker black on hover in mobile drawer */
+}
+
+.dark .navbar-responsive-text {
+  color: #d1d5db !important;
+}
+
+.dark .navbar-responsive-text:hover {
+  color: #ffffff !important;
+}
+
+/* Mobile responsiveness improvements */
+@media (max-width: 768px) {
+  .container {
+    @apply px-4;
+  }
+  
+  /* Ensure tables are scrollable on mobile */
+  .table-container {
+    @apply overflow-x-auto;
+  }
+  
+  /* Stack flex items on mobile */
+  .mobile-stack {
+    @apply flex-col space-y-2;
+  }
+  
+  /* Hide text on mobile for icon buttons */
+  .mobile-icon-only .button-text {
+    @apply sr-only;
+  }
+}

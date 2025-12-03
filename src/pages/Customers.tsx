@@ -224,36 +224,36 @@ const Customers = () => {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <div className="flex justify-center items-center h-64">
-          <div className="text-lg">Loading customers...</div>
+          <div className="text-lg text-gray-600 dark:text-gray-400">Loading customers...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
         <div>
-          <h1 className="text-2xl font-bold">Customer Management</h1>
-          <p className="text-gray-600">Manage your customers and their subscriptions</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Customer Management</h1>
+          <p className="text-gray-600 dark:text-gray-400">Manage your customers and their subscriptions</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setIsAddingCustomer(true)}>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button onClick={() => setIsAddingCustomer(true)} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" /> Add Customer
           </Button>
           <Button 
             variant="outline" 
             onClick={processExpiredTrials}
-            className="text-orange-600 border-orange-600 hover:bg-orange-50"
+            className="text-orange-600 border-orange-600 hover:bg-orange-50 w-full sm:w-auto"
           >
             <Clock className="mr-2 h-4 w-4" /> Process Expired Trials
           </Button>
           <Button 
             variant="outline" 
             onClick={() => setShowSubscriptionInfo(!showSubscriptionInfo)}
-            className="text-blue-600 border-blue-600 hover:bg-blue-50"
+            className="text-blue-600 border-blue-600 hover:bg-blue-50 w-full sm:w-auto"
           >
             <Info className="mr-2 h-4 w-4" /> 
             {showSubscriptionInfo ? 'Hide' : 'Show'} Subscription Info
@@ -263,7 +263,7 @@ const Customers = () => {
 
       {/* Subscription Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
@@ -320,22 +320,23 @@ const Customers = () => {
 
       <div className="space-y-4">
         {customers.map((customer) => (
-          <Card key={customer.id} className="w-full">
+          <Card key={customer.id} className="w-full hover:shadow-lg transition-shadow duration-200">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <User className="h-10 w-10 text-gray-400" />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-lg">{customer.name}</h3>
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+                <div className="flex items-start space-x-4">
+                  <User className="h-10 w-10 text-gray-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-white truncate">{customer.name}</h3>
                       <Badge 
                         variant={customer.subscriptionDetails.isExpired ? "destructive" : "default"}
                         style={{ backgroundColor: customer.subscriptionDetails.statusColor }}
+                        className="self-start sm:self-center"
                       >
                         {customer.subscriptionDetails.status || 'Unknown'}
                       </Badge>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400">
                       <div>
                         <p className="font-medium">Contact Info</p>
                         <p>{customer.email}</p>
@@ -357,14 +358,16 @@ const Customers = () => {
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 lg:flex-col lg:w-auto">
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="sm"
                     onClick={() => handleEdit(customer)}
                     title="Edit customer details"
+                    className="flex items-center gap-2"
                   >
                     <Edit className="h-4 w-4" />
+                    <span className="lg:hidden">Edit</span>
                   </Button>
                   {customer.subscriptionDetails.isExpired && (
                     <Button
@@ -390,11 +393,13 @@ const Customers = () => {
                   )}
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="sm"
                     onClick={() => handleDelete(customer.id)}
                     title="Delete customer"
+                    className="text-destructive hover:bg-red-50 flex items-center gap-2"
                   >
-                    <Trash2 className="h-4 w-4 text-destructive" />
+                    <Trash2 className="h-4 w-4" />
+                    <span className="lg:hidden">Delete</span>
                   </Button>
                 </div>
               </div>
