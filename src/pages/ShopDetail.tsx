@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import BarcodeScannerComponent from "react-qr-barcode-scanner";
+import BarcodeScanner from "react-qr-barcode-scanner";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -277,22 +277,23 @@ const ShopDetail = () => {
     : [];
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-6">
       {/* Shop Header */}
-      <div className="mb-8">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Store className="h-6 w-6" />
-              <h1 className="text-2xl font-bold">{shop?.name || "Unknown Shop"}</h1>
+      <div className="mb-4 sm:mb-8">
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Store className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <h1 className="text-xl sm:text-2xl font-bold truncate">{shop?.name || "Unknown Shop"}</h1>
             </div>
 
             {/* Add New Product Dialog */}
             <Dialog>
               <DialogTrigger asChild>
-                <Button>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Product
+                <Button size="sm" className="w-full xs:w-auto flex-shrink-0">
+                  <PlusCircle className="mr-1 sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Add Product</span>
+                  <span className="sm:hidden">Add</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-h-[80vh] w-full md:w-[400px] overflow-y-auto">
@@ -317,7 +318,7 @@ const ShopDetail = () => {
                     </div>
                     {showScanner && (
                       <div className="border rounded-lg p-2">
-                        <BarcodeScannerComponent
+                        <BarcodeScanner
                           width={300}
                           height={200}
                           onUpdate={(err, result) => {
@@ -362,40 +363,42 @@ const ShopDetail = () => {
             </Dialog>
           </div>
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Phone className="h-4 w-4" />
-              <span>{shop?.mobile || "Unknown mobile"}</span>
+            <div className="flex items-center gap-2 text-muted-foreground text-sm sm:text-base">
+              <Phone className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate">{shop?.mobile || "Unknown mobile"}</span>
             </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              <span>{shop?.address || "Unknown address"}</span>
+            <div className="flex items-center gap-2 text-muted-foreground text-sm sm:text-base">
+              <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate">{shop?.address || "Unknown address"}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="mb-6">
-        <div className="flex space-x-4">
+      <div className="mb-4 sm:mb-6">
+        <div className="flex space-x-2 sm:space-x-4 overflow-x-auto">
           <button
-            className={`px-4 py-2 border-b-2 ${
+            className={`px-3 sm:px-4 py-2 border-b-2 whitespace-nowrap text-sm sm:text-base ${
               activeTab === "availableProducts"
                 ? "border-blue-500 text-blue-500"
                 : "border-transparent text-gray-500"
             }`}
             onClick={() => setActiveTab("availableProducts")}
           >
-            Available Products
+            <span className="hidden sm:inline">Available Products</span>
+            <span className="sm:hidden">Available</span>
           </button>
           <button
-            className={`px-4 py-2 border-b-2 ${
+            className={`px-3 sm:px-4 py-2 border-b-2 whitespace-nowrap text-sm sm:text-base ${
               activeTab === "search"
                 ? "border-blue-500 text-blue-500"
                 : "border-transparent text-gray-500"
             }`}
             onClick={() => setActiveTab("search")}
           >
-            Search & Add Product
+            <span className="hidden sm:inline">Search & Add Product</span>
+            <span className="sm:hidden">Search & Add</span>
           </button>
         </div>
       </div>
@@ -403,39 +406,47 @@ const ShopDetail = () => {
       {/* Search & Add Products Tab */}
       {activeTab === "search" && (
         <>
-          <div className="mb-8">
+          <div className="mb-4 sm:mb-8">
             <Input
               placeholder="Search for a product to add..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full"
             />
           </div>
           {loading && <p>Loading...</p>}
           {error && <p className="text-red-500">{error}</p>}
           {!loading && !error && (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {fetchedProducts && fetchedProducts.length > 0 ? (
                 fetchedProducts.map((product) => (
-                  <div key={product.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
+                  <div key={product.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
+                    <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
                       <img
                         src={product.img && product.img[0] ? product.img[0] : fallbackImg}
                         alt={product.title}
-                        className="w-16 h-16 object-cover rounded-md"
+                        className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-md flex-shrink-0"
                         loading="lazy"
                       />
-                      <div>
-                        <h3 className="text-lg font-semibold">{product.title}</h3>
-                        <div className="text-sm text-gray-500 space-x-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm sm:text-lg font-semibold truncate">{product.title}</h3>
+                        <div className="text-xs sm:text-sm text-gray-500 flex flex-wrap gap-1 sm:gap-2">
                           <span>Case: {product.caseSize || "N/A"}</span>
+                          <span className="hidden sm:inline">•</span>
                           <span>Packet: {product.packetSize || "N/A"}</span>
+                          <span className="hidden sm:inline">•</span>
                           <span>Retail: {product.retailSize || "N/A"}</span>
                         </div>
                       </div>
                     </div>
-                    <Button onClick={() => openAddProductDialog(product)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add to Shop
+                    <Button 
+                      onClick={() => openAddProductDialog(product)}
+                      size="sm"
+                      className="w-full sm:w-auto flex-shrink-0"
+                    >
+                      <Plus className="h-4 w-4 mr-1 sm:mr-2" />
+                      <span className="hidden xs:inline">Add to Shop</span>
+                      <span className="xs:hidden">Add</span>
                     </Button>
                   </div>
                 ))
@@ -452,11 +463,12 @@ const ShopDetail = () => {
       {/* Available Products Tab */}
       {activeTab === "availableProducts" && (
         <>
-          <div className="mb-4">
+          <div className="mb-3 sm:mb-4">
             <Input
               placeholder="Search for a product..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full"
             />
           </div>
           
@@ -464,7 +476,7 @@ const ShopDetail = () => {
           {productsAtShopError && <p className="text-red-500">Error loading products: {productsAtShopError}</p>}
           
           {!productsAtShopLoading && (
-            <div className="space-y-4">
+            <div className="space-y-2 sm:space-y-4">
               {filteredProducts.length > 0 ? (
                 filteredProducts.map((product) => (
                   <ProductAtShopCard
@@ -537,7 +549,7 @@ const ShopDetail = () => {
               </div>
               {showAddProductScanner && (
                 <div className="border rounded-lg p-2">
-                  <BarcodeScannerComponent
+                  <BarcodeScanner
                     width={300}
                     height={200}
                     onUpdate={(err, result) => {

@@ -36,6 +36,18 @@
   }
 }
 
+/* Custom mobile responsive utilities */
+@layer utilities {
+  /* Extra small screens (480px and up) */
+  @media (min-width: 480px) {
+    .xs\:flex-row { flex-direction: row; }
+    .xs\:items-center { align-items: center; }
+    .xs\:w-auto { width: auto; }
+    .xs\:inline { display: inline; }
+    .xs\:hidden { display: none; }
+  }
+}
+
 .glass-card {
   @apply bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg;
 }

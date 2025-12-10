@@ -162,36 +162,36 @@ export const ProductAtShopCard = ({
             </Badge>
           </div>
         )}
-        <div className="flex items-center justify-between space-x-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           {/* Product Info */}
-          <div className="flex items-center space-x-4 flex-grow">
+          <div className="flex items-center space-x-3 sm:space-x-4 flex-grow min-w-0">
             <img
               src={img ? (Array.isArray(img) ? img[0] : img) : fallbackImg}
               alt={title}
-              className="w-16 h-16 object-cover rounded-md flex-shrink-0"
+              className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-md flex-shrink-0"
               loading="lazy"
             />
             <div className="flex-grow min-w-0">
-              <h3 className="text-lg font-semibold truncate">{title}</h3>
-              <div className="flex flex-wrap gap-2 mt-1 text-sm text-gray-600">
+              <h3 className="text-sm sm:text-lg font-semibold truncate">{title}</h3>
+              <div className="flex flex-wrap gap-1 sm:gap-2 mt-1 text-xs sm:text-sm text-gray-600">
                 <span>Case: {caseSize}</span>
-                <span>•</span>
+                <span className="hidden sm:inline">•</span>
                 <span>Packet: {packetSize}</span>
-                <span>•</span>
+                <span className="hidden sm:inline">•</span>
                 <span>Retail: {retailSize}</span>
                 {aiel && (
                   <>
-                    <span>•</span>
+                    <span className="hidden sm:inline">•</span>
                     <span>Aisle: {aiel}</span>
                   </>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2 mt-1">
-                <Badge variant="secondary" className="text-xs">
-                  Barcode: {barcode}
+              <div className="flex flex-wrap gap-1 sm:gap-2 mt-1">
+                <Badge variant="secondary" className="text-xs px-1 py-0">
+                  {barcode}
                 </Badge>
                 {caseBarcode && (
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs px-1 py-0">
                     Case: {caseBarcode}
                   </Badge>
                 )}
@@ -200,14 +200,14 @@ export const ProductAtShopCard = ({
           </div>
 
           {/* Price and Offer Section */}
-          <div className="flex flex-col items-end space-y-2 min-w-0">
+          <div className="flex flex-col sm:items-end space-y-2 min-w-0 w-full sm:w-auto">
             {!isEditing ? (
               <>
                 {/* Price Display */}
-                <div className="text-right">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className={`h-4 w-4 ${hasActiveOffer ? 'text-orange-600' : 'text-green-600'}`} />
-                    <span className={`text-lg font-bold ${hasActiveOffer ? 'text-orange-600' : 'text-green-600'}`}>
+                <div className="text-left sm:text-right w-full sm:w-auto">
+                  <div className="flex items-center gap-2 justify-start sm:justify-end">
+                    <DollarSign className={`h-3 w-3 sm:h-4 sm:w-4 ${hasActiveOffer ? 'text-orange-600' : 'text-green-600'}`} />
+                    <span className={`text-base sm:text-lg font-bold ${hasActiveOffer ? 'text-orange-600' : 'text-green-600'}`}>
                       £{currentPrice.toFixed(2)}
                     </span>
                     {hasActiveOffer && (
@@ -217,7 +217,7 @@ export const ProductAtShopCard = ({
                     )}
                   </div>
                   {hasActiveOffer && (
-                    <div className="text-sm text-gray-500 line-through">
+                    <div className="text-xs sm:text-sm text-gray-500 line-through">
                       Was: £{price.toFixed(2)}
                     </div>
                   )}
@@ -230,12 +230,12 @@ export const ProductAtShopCard = ({
 
                 {/* Offer Status */}
                 {hasActiveOffer && (
-                  <div className="text-center">
+                  <div className="text-left sm:text-center w-full sm:w-auto">
                     <Badge variant="destructive" className="mb-1">
                       <Tag className="h-3 w-3 mr-1" />
                       OFFER
                     </Badge>
-                    <div className="text-xs text-orange-600 flex items-center gap-1">
+                    <div className="text-xs text-orange-600 flex items-center gap-1 justify-start sm:justify-center">
                       <Clock className="h-3 w-3" />
                       {daysRemaining > 0 ? `${daysRemaining} days left` : 'Expires today'}
                     </div>
@@ -250,15 +250,16 @@ export const ProductAtShopCard = ({
                   variant={hasActiveOffer ? "default" : "outline"}
                   size="sm"
                   onClick={() => setIsEditing(true)}
-                  className={`mt-2 ${hasActiveOffer ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
+                  className={`mt-2 w-full sm:w-auto ${hasActiveOffer ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
                 >
-                  {hasActiveOffer ? 'Edit Offer' : 'Edit Price'}
+                  <span className="hidden sm:inline">{hasActiveOffer ? 'Edit Offer' : 'Edit Price'}</span>
+                  <span className="sm:hidden">Edit</span>
                 </Button>
               </>
             ) : (
               <>
                 {/* Edit Form */}
-                <div className="space-y-2 min-w-48">
+                <div className="space-y-2 w-full sm:min-w-48">
                   <div>
                     <label className="text-xs text-gray-600">Regular Price (£)</label>
                     <Input

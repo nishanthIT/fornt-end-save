@@ -5,7 +5,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Upload } from "lucide-react";
+import { ArrowLeft, Upload, ScanLine } from "lucide-react";
+import BarcodeScanner from "react-qr-barcode-scanner";
 import { ShopAvailability } from "@/components/ShopAvailability";
 import {
   Dialog,
@@ -52,6 +53,10 @@ const ProductDetail = () => {
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
+  
+  // Barcode scanner states
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannerType, setScannerType] = useState(null); // 'barcode' or 'caseBarcode'
 
   // Determine if the ID is a barcode or product ID
   const isBarcode = /^\d+$/.test(id); // Check if the ID is numeric (barcode)
@@ -137,24 +142,137 @@ const ProductDetail = () => {
     }
   }, [product, form]);
 
+  // Image compression function
+  const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.8): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions
+        let { width, height } = img;
+        
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw and compress
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   // Handle image selection
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setSelectedImage(file);
+      
+      // Check if file is an image
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Error",
+          description: "Please select a valid image file",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      try {
+        // Show loading state
+        toast({
+          title: "Processing",
+          description: "Compressing image...",
+        });
+        
+        // Compress the image
+        const compressedFile = await compressImage(file);
+        setSelectedImage(compressedFile);
 
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+        // Create preview
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreview(reader.result);
+        };
+        reader.readAsDataURL(compressedFile);
+        
+        toast({
+          title: "Success",
+          description: `Image compressed from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        });
+      } catch (error) {
+        console.error('Error compressing image:', error);
+        toast({
+          title: "Error",
+          description: "Failed to process image. Using original.",
+          variant: "destructive",
+        });
+        setSelectedImage(file);
+        
+        // Create preview with original file
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreview(reader.result);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
   // Trigger file input click
   const handleUploadClick = () => {
     fileInputRef.current?.click();
+  };
+
+  // Barcode scanner functions
+  const openScanner = (type) => {
+    setScannerType(type);
+    setIsScannerOpen(true);
+  };
+
+  const closeScanner = () => {
+    setIsScannerOpen(false);
+    setScannerType(null);
+  };
+
+  const handleScanResult = (err: any, result: any) => {
+    if (result && scannerType) {
+      form.setValue(scannerType, result.text);
+      toast({
+        title: "Success",
+        description: `${scannerType === 'barcode' ? 'Barcode' : 'Case Barcode'} scanned successfully!`,
+      });
+      closeScanner();
+    }
   };
 
   // Handle form submission
@@ -295,7 +413,18 @@ const ProductDetail = () => {
                           <FormItem>
                             <FormLabel>Barcode *</FormLabel>
                             <FormControl>
-                              <Input {...field} />
+                              <div className="flex gap-2">
+                                <Input {...field} className="flex-1" />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openScanner('barcode')}
+                                  className="px-3"
+                                >
+                                  <ScanLine className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -308,7 +437,18 @@ const ProductDetail = () => {
                           <FormItem>
                             <FormLabel>Case Barcode</FormLabel>
                             <FormControl>
-                              <Input {...field} />
+                              <div className="flex gap-2">
+                                <Input {...field} className="flex-1" />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openScanner('caseBarcode')}
+                                  className="px-3"
+                                >
+                                  <ScanLine className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -406,7 +546,8 @@ const ProductDetail = () => {
                           )}
                           <input
                             type="file"
-                            accept="image/*"
+                            accept="image/*,image/heic,image/heif"
+                            capture="environment"
                             className="hidden"
                             ref={fileInputRef}
                             onChange={handleImageChange}
@@ -423,6 +564,34 @@ const ProductDetail = () => {
                       </Button>
                     </form>
                   </Form>
+                </DialogContent>
+              </Dialog>
+
+              {/* Barcode Scanner Modal */}
+              <Dialog open={isScannerOpen} onOpenChange={closeScanner}>
+                <DialogContent className="max-w-md w-full max-h-[90vh] overflow-hidden">
+                  <DialogHeader>
+                    <DialogTitle>
+                      Scan {scannerType === 'barcode' ? 'Barcode' : 'Case Barcode'}
+                    </DialogTitle>
+                  </DialogHeader>
+                  
+                  {isScannerOpen && (
+                    <div className="w-full h-64 mb-4 overflow-hidden rounded-md border">
+                      <BarcodeScanner
+                        onUpdate={handleScanResult}
+                        delay={500}
+                        width="100%"
+                        height="100%"
+                      />
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={closeScanner}>
+                      Cancel
+                    </Button>
+                  </div>
                 </DialogContent>
               </Dialog>
             </div>
