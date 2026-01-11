@@ -5,7 +5,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Upload, ScanLine } from "lucide-react";
+import { ArrowLeft, Upload, ScanLine, X } from "lucide-react";
 import BarcodeScanner from "react-qr-barcode-scanner";
 import { ShopAvailability } from "@/components/ShopAvailability";
 import {
@@ -245,6 +245,15 @@ const ProductDetail = () => {
         };
         reader.readAsDataURL(file);
       }
+    }
+  };
+
+  // Handle removing the selected image
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -520,11 +529,25 @@ const ProductDetail = () => {
                         >
                           {imagePreview ? (
                             <div className="text-center">
-                              <img
-                                src={imagePreview}
-                                alt="Preview"
-                                className="mx-auto max-h-40 object-contain mb-2"
-                              />
+                              <div className="relative inline-block">
+                                <img
+                                  src={imagePreview}
+                                  alt="Preview"
+                                  className="mx-auto max-h-40 object-contain mb-2"
+                                />
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  className="absolute top-1 right-1 h-6 w-6 p-0 rounded-full"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveImage();
+                                  }}
+                                  type="button"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
                               <Button
                                 variant="outline"
                                 size="sm"

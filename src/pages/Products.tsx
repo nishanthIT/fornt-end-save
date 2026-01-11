@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { ProductCard } from "@/components/ProductCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, PlusCircle, Barcode, Upload, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, PlusCircle, Barcode, Upload, Filter, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Dialog,
@@ -39,9 +39,11 @@ const Products = () => {
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isAddScannerOpen, setIsAddScannerOpen] = useState(false);
+  const [isCaseBarcodeAddScannerOpen, setIsCaseBarcodeAddScannerOpen] = useState(false);
   
   // State for adding a new product
   const [addBarcode, setAddBarcode] = useState<string>("");
+  const [addCaseBarcode, setAddCaseBarcode] = useState<string>("");
   const [productName, setProductName] = useState<string>("");
   const [caseSize, setCaseSize] = useState<string>("");
   const [packetSize, setPacketSize] = useState<string>("");
@@ -90,6 +92,14 @@ const Products = () => {
     if (result) {
       setIsAddScannerOpen(false);
       setAddBarcode(result.text);
+    }
+  };
+
+  // Handle scanning for adding a product case barcode
+  const handleScanForAddCaseBarcode = (err: any, result: any) => {
+    if (result) {
+      setIsCaseBarcodeAddScannerOpen(false);
+      setAddCaseBarcode(result.text);
     }
   };
 
@@ -180,6 +190,15 @@ const Products = () => {
     fileInputRef.current?.click();
   };
 
+  // Handle removing the selected image
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   // Handle form submission
   const handleSubmit = async () => {
     if (!addBarcode || !productName || !packetSize) {
@@ -197,6 +216,7 @@ const Products = () => {
       formData.append("packetSize", packetSize);
       formData.append("retailSize", retailSize);
       formData.append("barcode", addBarcode);
+      formData.append("caseBarcode", addCaseBarcode);
       
       if (selectedImage) {
         formData.append("image", selectedImage);
@@ -218,6 +238,7 @@ const Products = () => {
 
       // Reset form after successful submission
       setAddBarcode("");
+      setAddCaseBarcode("");
       setProductName("");
       setCaseSize("");
       setPacketSize("");
@@ -282,6 +303,21 @@ const Products = () => {
                       <Barcode className="h-4 w-4" />
                     </Button>
                   </div>
+                  <div className="relative">
+                    <Input
+                      placeholder="Case Barcode (Optional)"
+                      value={addCaseBarcode}
+                      onChange={(e) => setAddCaseBarcode(e.target.value)}
+                    />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="absolute right-1 top-1/2 -translate-y-1/2"
+                      onClick={() => setIsCaseBarcodeAddScannerOpen(true)}
+                    >
+                      <Barcode className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <Input
                     placeholder="Case Size"
                     value={caseSize}
@@ -324,12 +360,22 @@ const Products = () => {
                 </div>
 
                 {imagePreview && (
-                  <div className="mt-2 flex justify-center">
-                    <img 
-                      src={imagePreview} 
-                      alt="Product Preview" 
-                      className="max-h-40 max-w-full object-contain rounded"
-                    />
+                  <div className="mt-2 flex justify-center relative">
+                    <div className="relative">
+                      <img 
+                        src={imagePreview} 
+                        alt="Product Preview" 
+                        className="max-h-40 max-w-full object-contain rounded"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="absolute top-1 right-1 h-6 w-6 p-0 rounded-full"
+                        onClick={handleRemoveImage}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -486,6 +532,24 @@ const Products = () => {
                 width="100%"
                 height={250}
                 onUpdate={handleScanForAddProduct}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Case Barcode Scanner Modal for Add Product */}
+      {isCaseBarcodeAddScannerOpen && (
+        <Dialog open={isCaseBarcodeAddScannerOpen} onOpenChange={setIsCaseBarcodeAddScannerOpen}>
+          <DialogContent className="flex flex-col items-center w-[95vw] max-w-md mx-auto">
+            <DialogHeader>
+              <DialogTitle>Scan Case Barcode</DialogTitle>
+            </DialogHeader>
+            <div className="w-full max-w-full overflow-hidden">
+              <BarcodeScannerComponent
+                width="100%"
+                height={250}
+                onUpdate={handleScanForAddCaseBarcode}
               />
             </div>
           </DialogContent>

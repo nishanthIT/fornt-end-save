@@ -60,6 +60,8 @@ const ShopDetail = () => {
   const [addProductcaseSize , setAddProductcaseSize ] = useState("");
   const [addProductpacketSize, setAddProductpacketSize] = useState("");
   const [showAddProductScanner, setShowAddProductScanner] = useState(false);
+  const [showProductNotFoundDialog, setShowProductNotFoundDialog] = useState(false);
+  const [notFoundProductName, setNotFoundProductName] = useState("");
   
   // Force refresh state
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -168,6 +170,20 @@ const ShopDetail = () => {
     setAddProductpacketSize(product.packetSize || ""); 
     setAddProductcaseSize(product.caseSize || ""); 
     setShowAddProductDialog(true);
+  };
+
+  // Function to handle product not found scenario
+  const handleProductNotFound = (searchTerm) => {
+    setNotFoundProductName(searchTerm);
+    setShowProductNotFoundDialog(true);
+  };
+
+  // Function to confirm adding new product
+  const confirmAddNewProduct = () => {
+    setTitle(notFoundProductName);
+    setShowProductNotFoundDialog(false);
+    // Trigger the add product dialog
+    document.querySelector('[data-trigger="add-new-product"]')?.click();
   };
 
   // Function to add existing product from search
@@ -290,7 +306,7 @@ const ShopDetail = () => {
             {/* Add New Product Dialog */}
             <Dialog>
               <DialogTrigger asChild>
-                <Button size="sm" className="w-full xs:w-auto flex-shrink-0">
+                <Button size="sm" className="w-full xs:w-auto flex-shrink-0" data-trigger="add-new-product">
                   <PlusCircle className="mr-1 sm:mr-2 h-4 w-4" />
                   <span className="hidden sm:inline">Add Product</span>
                   <span className="sm:hidden">Add</span>
@@ -453,7 +469,17 @@ const ShopDetail = () => {
               ) : searchQuery === "" ? (
                 <p>Start your search</p>
               ) : (
-                <p>No products found for "{searchQuery}".</p>
+                <div className="text-center py-8">
+                  <p className="mb-4">No products found for "{searchQuery}".</p>
+                  <Button
+                    onClick={() => handleProductNotFound(searchQuery)}
+                    variant="outline"
+                    className="mx-auto"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add "{searchQuery}" as new product
+                  </Button>
+                </div>
               )}
             </div>
           )}
@@ -619,6 +645,32 @@ const ShopDetail = () => {
             >
               {isSubmitting ? "Adding Product..." : "Add Product to Shop"}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Not Found Dialog */}
+      <Dialog open={showProductNotFoundDialog} onOpenChange={setShowProductNotFoundDialog}>
+        <DialogContent className="w-[95vw] max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle>Product Not Found</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="mb-4">
+              Product with name "{notFoundProductName}" does not exist in our database.
+            </p>
+            <p className="mb-6">Do you want to add it as a new product?</p>
+            <div className="flex gap-2 justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowProductNotFoundDialog(false)}
+              >
+                No
+              </Button>
+              <Button onClick={confirmAddNewProduct}>
+                Yes, Add Product
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
