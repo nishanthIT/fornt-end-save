@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle, XCircle, Clock, User, Package, Store, Phone, Calendar, ArrowRight, RefreshCw } from "lucide-react";
+import { getImageUrl } from "@/utils/imageUtils";
 import { toast } from "sonner";
 import { API_CONFIG } from "@/config/api";
 
@@ -264,7 +265,7 @@ const PriceCorrections: React.FC = () => {
           </div>
           {report.product.img && (
             <img 
-              src={report.product.img} 
+              src={getImageUrl(report.product.img)} 
               alt={report.product.title}
               className="w-16 h-16 object-cover rounded"
             />

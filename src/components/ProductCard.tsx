@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { getImageUrl } from "@/utils/imageUtils";
 
 interface ProductCardProps {
   id: string;
@@ -37,6 +38,8 @@ export const ProductCard = ({
   const isInShopDetail = location.pathname.includes("/shop/");
   const isInProductsPage = location.pathname === "/products"; // Check if the current route is /products
 
+  const imageUrl = getImageUrl(img);
+
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigate(`/shop/${shopId}/product/${id}`);
@@ -53,9 +56,6 @@ export const ProductCard = ({
     }
   };
 
-  // Fallback image URL
-  const fallbackImg = "https://www.pngfind.com/pngs/m/131-1312918_png-file-svg-product-icon-transparent-png.png";
-
   return (
     <Card
       className="product-card glass-card cursor-pointer w-full h-auto min-h-32"
@@ -64,8 +64,7 @@ export const ProductCard = ({
       <CardContent className="p-4 h-full">
         <div className="flex items-center space-x-4 h-full">
           <img
-            //src={img && img[0] ? img[0] : fallbackImg}
-            src={img ? (Array.isArray(img) ? img[0] : img) : fallbackImg}
+            src={imageUrl}
             alt={title}
             className="w-16 h-16 object-cover rounded-md flex-shrink-0"
             loading="lazy"

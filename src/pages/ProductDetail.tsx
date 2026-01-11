@@ -29,6 +29,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { getImageUrl } from "@/utils/imageUtils";
 
 // Form validation schema
 const productSchema = z.object({
@@ -376,8 +377,7 @@ const ProductDetail = () => {
         <div className="space-y-6">
           <div className="relative h-96">
             <img
-              // src={product.img?.[0] || null}
-              src={product.img ? (Array.isArray(product.img) ? product.img[0] : product.img) : null}
+              src={getImageUrl(product.img)}
               alt={product.title}
               className="w-96 h-96 object-cover rounded-lg shadow-lg"
             />

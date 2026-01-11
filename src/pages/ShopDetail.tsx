@@ -25,6 +25,7 @@ import {
 import BarcodeScanner from "react-qr-barcode-scanner";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { getImageUrl } from "@/utils/imageUtils";
 
 const ShopDetail = () => {
   const { id } = useParams();
@@ -83,8 +84,6 @@ const ShopDetail = () => {
       setProducts(productsAtShop);
     }
   }, [productsAtShop]);
-
-  const fallbackImg = "https://via.placeholder.com/64";
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -439,7 +438,7 @@ const ShopDetail = () => {
                   <div key={product.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
                     <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
                       <img
-                        src={product.img && product.img[0] ? product.img[0] : fallbackImg}
+                        src={getImageUrl(product.img)}
                         alt={product.title}
                         className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-md flex-shrink-0"
                         loading="lazy"
@@ -543,7 +542,7 @@ const ShopDetail = () => {
             {selectedProduct && (
               <div className="flex items-center space-x-4 mb-4">
                 <img
-                  src={selectedProduct.img && selectedProduct.img[0] ? selectedProduct.img[0] : fallbackImg}
+                  src={getImageUrl(selectedProduct.img)}
                   alt={selectedProduct.title}
                   className="w-16 h-16 object-cover rounded-md"
                   loading="lazy"
