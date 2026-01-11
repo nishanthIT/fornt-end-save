@@ -7,6 +7,11 @@ export const getImageUrl = (imagePath: string | string[] | null): string => {
   // Handle array case (for backward compatibility)
   const path = Array.isArray(imagePath) ? imagePath[0] : imagePath;
   
+  // Ensure path is a string
+  if (typeof path !== 'string') {
+    return "https://www.pngfind.com/pngs/m/131-1312918_png-file-svg-product-icon-transparent-png.png";
+  }
+  
   // If it's already a full URL, return as is
   if (path.startsWith('http://') || path.startsWith('https://')) {
     return path;

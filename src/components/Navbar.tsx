@@ -182,12 +182,12 @@ export const Navbar = () => {
 
           {/* Right side buttons */}
           <div className="flex items-center space-x-2">
-            {/* Logout Button */}
+            {/* Logout Button - Desktop only */}
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={handleLogout}
-              className="hover:bg-gray-100 hover:bg-opacity-20"
+              className="hidden lg:flex hover:bg-gray-100 hover:bg-opacity-20"
               style={{ color: '#ffffff' }}
             >
               <LogOut className="h-5 w-5" style={{ color: '#ffffff' }} />
@@ -224,6 +224,22 @@ export const Navbar = () => {
                         <span style={{ color: '#000000' }}>{item.label}</span>
                       </Link>
                     ))}
+                    
+                    {/* Logout Button in Mobile Menu */}
+                    <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          handleLogout();
+                          setOpen(false);
+                        }}
+                        className="flex items-center gap-3 px-3 py-2 text-sm font-medium hover:bg-gray-100 rounded-md transition-colors duration-200 w-full justify-start"
+                        style={{ color: '#000000' }}
+                      >
+                        <LogOut className="h-5 w-5" style={{ color: '#000000' }} />
+                        <span style={{ color: '#000000' }}>Logout</span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </SheetContent>

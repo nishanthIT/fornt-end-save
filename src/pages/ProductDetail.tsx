@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Upload, ScanLine, X } from "lucide-react";
 import BarcodeScanner from "react-qr-barcode-scanner";
 import { ShopAvailability } from "@/components/ShopAvailability";
+import { TopLoadingBar } from "@/components/TopLoadingBar";
+import { toast as sonnerToast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -52,7 +54,7 @@ const ProductDetail = () => {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(false);
   const fileInputRef = useRef(null);
   
   // Barcode scanner states
@@ -296,8 +298,13 @@ const ProductDetail = () => {
       return;
     }
 
-    setIsSubmitting(true);
+    // Exit editing mode immediately
+    setIsEditing(false);
+    
+    // Start loading bar
+    setUploadProgress(true);
 
+    // Submit in background
     try {
       const formData = new FormData();
       formData.append("title", values.title);
@@ -335,21 +342,12 @@ const ProductDetail = () => {
         ...updatedData.data,
       });
 
-      toast({
-        title: "Success",
-        description: "Product updated successfully",
-      });
-
-      setIsEditing(false);
+      sonnerToast.success("Product updated successfully");
     } catch (error) {
       console.error("Error updating product:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update product",
-        variant: "destructive",
-      });
+      sonnerToast.error(error.message || "Failed to update product");
     } finally {
-      setIsSubmitting(false);
+      setUploadProgress(false);
     }
   };
 
@@ -366,7 +364,9 @@ const ProductDetail = () => {
   }
 
   return (
-    <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <>
+      <TopLoadingBar isLoading={uploadProgress} />
+      <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Button variant="ghost" className="mb-6" onClick={() => navigate(-1)}>
         <ArrowLeft className="mr-2 h-4 w-4" />
         Back to Products
@@ -581,9 +581,8 @@ const ProductDetail = () => {
                       <Button
                         type="submit"
                         className="w-full"
-                        disabled={isSubmitting}
                       >
-                        {isSubmitting ? "Updating..." : "Save Changes"}
+                        Save Changes
                       </Button>
                     </form>
                   </Form>
@@ -673,7 +672,8 @@ const ProductDetail = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

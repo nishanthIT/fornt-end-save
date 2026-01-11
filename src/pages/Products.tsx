@@ -14,10 +14,14 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogDescription,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import useFetchProducts from "@/hooks/useFetchProducts";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
+import { TopLoadingBar } from "@/components/TopLoadingBar";
+import { toast } from "sonner";
 
 const Products = () => {
   // Use search params for persistent filters
@@ -51,7 +55,7 @@ const Products = () => {
   const [rrp, setRrp] = useState<string>("");
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -279,21 +283,36 @@ const Products = () => {
       return;
     }
 
-    setIsSubmitting(true);
+    // Close dialog immediately and clear form
+    const formData = new FormData();
+    formData.append("title", productName);
+    formData.append("rrp", rrp);
+    formData.append("caseSize", caseSize);
+    formData.append("packetSize", packetSize);
+    formData.append("retailSize", retailSize);
+    formData.append("barcode", addBarcode);
+    formData.append("caseBarcode", addCaseBarcode);
+    
+    if (selectedImage) {
+      formData.append("image", selectedImage);
+    }
 
+    // Reset form immediately
+    setAddBarcode("");
+    setAddCaseBarcode("");
+    setProductName("");
+    setCaseSize("");
+    setPacketSize("");
+    setRetailSize("");
+    setRrp("");
+    setSelectedImage(null);
+    setImagePreview(null);
+    
+    // Start the loading bar
+    setUploadProgress(true);
+
+    // Submit in background without blocking UI
     try {
-      const formData = new FormData();
-      formData.append("title", productName);
-      formData.append("rrp", rrp);
-      formData.append("caseSize", caseSize);
-      formData.append("packetSize", packetSize);
-      formData.append("retailSize", retailSize);
-      formData.append("barcode", addBarcode);
-      formData.append("caseBarcode", addCaseBarcode);
-      
-      if (selectedImage) {
-        formData.append("image", selectedImage);
-      }
       const authToken = localStorage.getItem("auth_token");
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addproduct`, {
         method: "POST",
@@ -309,31 +328,21 @@ const Products = () => {
         throw new Error(errorData.error || "Failed to add product");
       }
 
-      // Reset form after successful submission
-      setAddBarcode("");
-      setAddCaseBarcode("");
-      setProductName("");
-      setCaseSize("");
-      setPacketSize("");
-      setRetailSize("");
-      setRrp("");
-      setSelectedImage(null);
-      setImagePreview(null);
-      
-      // Refresh products list or navigate
-      alert("Product added successfully!");
+      // Success feedback
+      toast.success("Product added successfully!");
     } catch (error) {
       console.error("Error adding product:", error);
-      console.log(error);
-      alert(error instanceof Error ? error.message : "Failed to add product");
+      toast.error(error instanceof Error ? error.message : "Failed to add product");
     } finally {
-      setIsSubmitting(false);
+      setUploadProgress(false);
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-      <div className="space-y-6">
+    <>
+      <TopLoadingBar isLoading={uploadProgress} />
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2 text-gray-900 dark:text-white">Products</h1>
@@ -353,6 +362,9 @@ const Products = () => {
             <DialogContent className="w-[95vw] max-w-md mx-auto">
               <DialogHeader>
                 <DialogTitle>Add New Product</DialogTitle>
+                <DialogDescription>
+                  Create a new product by filling in the details below.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -452,13 +464,14 @@ const Products = () => {
                   </div>
                 )}
 
-                <Button 
-                  className="w-full" 
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Adding..." : "Add Product"}
-                </Button>
+                <DialogClose asChild>
+                  <Button 
+                    className="w-full" 
+                    onClick={handleSubmit}
+                  >
+                    Add Product
+                  </Button>
+                </DialogClose>
               </div>
             </DialogContent>
           </Dialog>
@@ -581,6 +594,9 @@ const Products = () => {
           <DialogContent className="flex flex-col items-center w-[95vw] max-w-md mx-auto">
             <DialogHeader>
               <DialogTitle>Scan Barcode</DialogTitle>
+              <DialogDescription>
+                Point your camera at a product barcode to search for it.
+              </DialogDescription>
             </DialogHeader>
             <div className="w-full max-w-full overflow-hidden">
               <BarcodeScannerComponent
@@ -598,7 +614,10 @@ const Products = () => {
         <Dialog open={isAddScannerOpen} onOpenChange={setIsAddScannerOpen}>
           <DialogContent className="flex flex-col items-center w-[95vw] max-w-md mx-auto">
             <DialogHeader>
-              <DialogTitle>Scan Barcode</DialogTitle>
+              <DialogTitle>Scan Product Barcode</DialogTitle>
+              <DialogDescription>
+                Scan the product barcode to auto-fill the barcode field.
+              </DialogDescription>
             </DialogHeader>
             <div className="w-full max-w-full overflow-hidden">
               <BarcodeScannerComponent
@@ -617,6 +636,9 @@ const Products = () => {
           <DialogContent className="flex flex-col items-center w-[95vw] max-w-md mx-auto">
             <DialogHeader>
               <DialogTitle>Scan Case Barcode</DialogTitle>
+              <DialogDescription>
+                Scan the case barcode to auto-fill the case barcode field.
+              </DialogDescription>
             </DialogHeader>
             <div className="w-full max-w-full overflow-hidden">
               <BarcodeScannerComponent
@@ -634,6 +656,9 @@ const Products = () => {
         <DialogContent className="w-[95vw] max-w-md mx-auto">
           <DialogHeader>
             <DialogTitle>Filter Products</DialogTitle>
+            <DialogDescription>
+              Apply filters to narrow down the product list.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-4">
@@ -704,7 +729,8 @@ const Products = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 };
 
