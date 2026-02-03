@@ -1,5 +1,5 @@
 import { Scanner } from "@yudiel/react-qr-scanner";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface OptimizedScannerProps {
   onScan: (result: string) => void;
@@ -8,6 +8,11 @@ interface OptimizedScannerProps {
   height?: string | number;
   paused?: boolean;
 }
+
+// Detect if the device is Android
+const isAndroid = () => {
+  return /android/i.test(navigator.userAgent);
+};
 
 /**
  * OptimizedScanner - A barcode/QR scanner with better autofocus performance
@@ -22,13 +27,52 @@ export const OptimizedScanner = ({
   paused = false,
 }: OptimizedScannerProps) => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check camera permission on mount
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then(() => setHasPermission(true))
-      .catch(() => setHasPermission(false));
+    const checkPermission = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: "environment" } 
+        });
+        // Stop the stream immediately after checking
+        stream.getTracks().forEach(track => track.stop());
+        setHasPermission(true);
+        setCameraError(null);
+      } catch (error) {
+        console.error("Camera permission error:", error);
+        setHasPermission(false);
+        if (error instanceof Error) {
+          setCameraError(error.message);
+        }
+      }
+    };
+    
+    checkPermission();
+  }, []);
+
+  // Get constraints based on device type - Android needs simpler constraints
+  const getConstraints = useCallback((): MediaTrackConstraints => {
+    if (isAndroid()) {
+      // Simplified constraints for Android - avoid advanced constraints that may not be supported
+      return {
+        facingMode: "environment",
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      };
+    }
+    
+    // iOS and other devices can use more advanced constraints
+    return {
+      facingMode: "environment",
+      width: { ideal: 1280, min: 640 },
+      height: { ideal: 720, min: 480 },
+      // Request continuous autofocus for faster focusing (iOS supported)
+      advanced: [
+        { focusMode: "continuous" } as MediaTrackConstraintSet,
+      ],
+    };
   }, []);
 
   if (hasPermission === false) {
@@ -36,6 +80,7 @@ export const OptimizedScanner = ({
       <div className="flex items-center justify-center bg-gray-100 rounded-md p-4" style={{ width, height }}>
         <p className="text-sm text-gray-500 text-center">
           Camera permission denied. Please allow camera access to scan barcodes.
+          {cameraError && <span className="block mt-1 text-xs text-red-500">{cameraError}</span>}
         </p>
       </div>
     );
@@ -55,16 +100,7 @@ export const OptimizedScanner = ({
         }}
         paused={paused}
         scanDelay={300}
-        constraints={{
-          facingMode: "environment",
-          // Optimized video constraints for better autofocus on mobile devices
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 480 },
-          // Request continuous autofocus for faster focusing
-          advanced: [
-            { focusMode: "continuous" } as MediaTrackConstraintSet,
-          ],
-        }}
+        constraints={getConstraints()}
         styles={{
           container: {
             width: "100%",
