@@ -70,6 +70,9 @@ const Customers = () => {
     password: "",
   });
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [upgradingCustomerId, setUpgradingCustomerId] = useState<number | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<number>(30);
 
   const fetchCustomers = async () => {
     try {
@@ -116,22 +119,33 @@ const Customers = () => {
     toast.success("Customer deleted successfully!");
   };
 
-  const handleUpgradeCustomer = async (customerId: number) => {
+  const openUpgradeModal = (customerId: number) => {
+    setUpgradingCustomerId(customerId);
+    setSelectedDuration(30); // Default to 30 days
+    setIsUpgradeModalOpen(true);
+  };
+
+  const handleUpgradeCustomer = async () => {
+    if (!upgradingCustomerId) return;
+    
     try {
-      const response = await fetch(getAdminUrl(API_CONFIG.ADMIN.CUSTOMER_SUBSCRIPTION(customerId)), {
+      const endDate = new Date(Date.now() + selectedDuration * 24 * 60 * 60 * 1000);
+      const response = await fetch(getAdminUrl(API_CONFIG.ADMIN.CUSTOMER_SUBSCRIPTION(upgradingCustomerId)), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           subscriptionStatus: 'premium',
-          subscriptionEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
+          subscriptionEndDate: endDate.toISOString(),
         }),
       });
 
       if (response.ok) {
         await fetchCustomers(); // Refresh the list
-        toast.success('Customer upgraded to premium successfully!');
+        toast.success(`Customer upgraded to premium for ${selectedDuration} days!`);
+        setIsUpgradeModalOpen(false);
+        setUpgradingCustomerId(null);
       } else {
         toast.error('Failed to upgrade customer');
       }
@@ -343,11 +357,17 @@ const Customers = () => {
                       </div>
                       <div>
                         <p className="font-medium">Subscription Details</p>
-                        {customer.subscriptionDetails.daysRemaining !== 'Unknown' && (
+                        {customer.subscriptionDetails.daysRemaining !== undefined && customer.subscriptionDetails.daysRemaining !== null && (
                           <p>Days remaining: <span className="font-semibold">{customer.subscriptionDetails.daysRemaining}</span></p>
                         )}
+                        {customer.subscriptionStatus === 'premium' && customer.trialStartDate && (
+                          <p>Started: <span className="font-semibold">{new Date(customer.trialStartDate).toLocaleDateString()}</span></p>
+                        )}
                         {customer.subscriptionDetails.trialEndDate && (
-                          <p>Trial ends: {customer.subscriptionDetails.trialEndDate}</p>
+                          <p>{customer.subscriptionStatus === 'premium' ? 'Ends' : 'Trial ends'}: <span className="font-semibold">{customer.subscriptionDetails.trialEndDate}</span></p>
+                        )}
+                        {customer.subscriptionStatus === 'premium' && customer.trialEndDate && !customer.subscriptionDetails.trialEndDate && (
+                          <p>Ends: <span className="font-semibold">{new Date(customer.trialEndDate).toLocaleDateString()}</span></p>
                         )}
                       </div>
                       <div>
@@ -369,11 +389,11 @@ const Customers = () => {
                     <Edit className="h-4 w-4" />
                     <span className="lg:hidden">Edit</span>
                   </Button>
-                  {customer.subscriptionDetails.isExpired && (
+                  {customer.subscriptionStatus !== 'premium' && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleUpgradeCustomer(customer.id)}
+                      onClick={() => openUpgradeModal(customer.id)}
                       className="text-green-600 border-green-600 hover:bg-green-50"
                     >
                       Upgrade
@@ -447,9 +467,19 @@ const Customers = () => {
                   <p className="text-sm">
                     <span className="font-medium">Status:</span> {editingCustomer.subscriptionDetails.status}
                   </p>
-                  {editingCustomer.subscriptionDetails.daysRemaining !== 'Unknown' && (
+                  {editingCustomer.subscriptionDetails.daysRemaining !== undefined && editingCustomer.subscriptionDetails.daysRemaining !== null && (
                     <p className="text-sm">
                       <span className="font-medium">Days Remaining:</span> {editingCustomer.subscriptionDetails.daysRemaining}
+                    </p>
+                  )}
+                  {editingCustomer.subscriptionDetails.trialEndDate && (
+                    <p className="text-sm">
+                      <span className="font-medium">{editingCustomer.subscriptionStatus === 'premium' ? 'Subscription Ends:' : 'Trial Ends:'}</span> {editingCustomer.subscriptionDetails.trialEndDate}
+                    </p>
+                  )}
+                  {editingCustomer.subscriptionStatus === 'premium' && editingCustomer.trialEndDate && !editingCustomer.subscriptionDetails.trialEndDate && (
+                    <p className="text-sm">
+                      <span className="font-medium">Subscription Ends:</span> {new Date(editingCustomer.trialEndDate).toLocaleDateString()}
                     </p>
                   )}
                   <p className="text-sm">
@@ -465,6 +495,70 @@ const Customers = () => {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Upgrade Subscription Dialog */}
+      <Dialog open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upgrade to Premium</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-gray-600">Select subscription duration:</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant={selectedDuration === 7 ? "default" : "outline"}
+                onClick={() => setSelectedDuration(7)}
+                className="h-16 flex flex-col"
+              >
+                <span className="font-bold">7 Days</span>
+                <span className="text-xs opacity-80">1 Week</span>
+              </Button>
+              <Button
+                variant={selectedDuration === 30 ? "default" : "outline"}
+                onClick={() => setSelectedDuration(30)}
+                className="h-16 flex flex-col"
+              >
+                <span className="font-bold">30 Days</span>
+                <span className="text-xs opacity-80">1 Month</span>
+              </Button>
+              <Button
+                variant={selectedDuration === 90 ? "default" : "outline"}
+                onClick={() => setSelectedDuration(90)}
+                className="h-16 flex flex-col"
+              >
+                <span className="font-bold">90 Days</span>
+                <span className="text-xs opacity-80">3 Months</span>
+              </Button>
+              <Button
+                variant={selectedDuration === 180 ? "default" : "outline"}
+                onClick={() => setSelectedDuration(180)}
+                className="h-16 flex flex-col"
+              >
+                <span className="font-bold">180 Days</span>
+                <span className="text-xs opacity-80">6 Months</span>
+              </Button>
+              <Button
+                variant={selectedDuration === 365 ? "default" : "outline"}
+                onClick={() => setSelectedDuration(365)}
+                className="h-16 flex flex-col col-span-2"
+              >
+                <span className="font-bold">365 Days</span>
+                <span className="text-xs opacity-80">1 Year</span>
+              </Button>
+            </div>
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Selected:</strong> {selectedDuration} days
+                <br />
+                <strong>Expires:</strong> {new Date(Date.now() + selectedDuration * 24 * 60 * 60 * 1000).toLocaleDateString()}
+              </p>
+            </div>
+            <Button onClick={handleUpgradeCustomer} className="w-full bg-green-600 hover:bg-green-700">
+              Confirm Upgrade
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

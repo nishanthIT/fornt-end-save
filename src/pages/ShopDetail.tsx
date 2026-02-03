@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import BarcodeScanner from "react-qr-barcode-scanner";
+import { OptimizedScanner } from "@/components/OptimizedScanner";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { getImageUrl } from "@/utils/imageUtils";
@@ -333,12 +333,10 @@ const ShopDetail = () => {
                     </div>
                     {showScanner && (
                       <div className="border rounded-lg p-2">
-                        <BarcodeScanner
+                        <OptimizedScanner
                           width={300}
                           height={200}
-                          onUpdate={(err, result) => {
-                            if (result) setCaseBarcode(result.text);
-                          }}
+                          onScan={(result) => setCaseBarcode(result)}
                         />
                       </div>
                     )}
@@ -574,12 +572,10 @@ const ShopDetail = () => {
               </div>
               {showAddProductScanner && (
                 <div className="border rounded-lg p-2">
-                  <BarcodeScanner
+                  <OptimizedScanner
                     width={300}
                     height={200}
-                    onUpdate={(err, result) => {
-                      if (result) setAddProductCaseBarcode(result.text);
-                    }}
+                    onScan={(result) => setAddProductCaseBarcode(result)}
                   />
                 </div>
               )}

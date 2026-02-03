@@ -182,7 +182,7 @@ export const ProductAtShopCard = ({
                 {aiel && (
                   <>
                     <span className="hidden sm:inline">•</span>
-                    <span>Aisle: {aiel}</span>
+                    <span>Aile: {aiel}</span>
                   </>
                 )}
               </div>

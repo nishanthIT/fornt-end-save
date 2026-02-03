@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import useFetchProducts from "@/hooks/useFetchProducts";
-import BarcodeScannerComponent from "react-qr-barcode-scanner";
+import { OptimizedScanner } from "@/components/OptimizedScanner";
 import { TopLoadingBar } from "@/components/TopLoadingBar";
 import { toast } from "sonner";
 
@@ -599,10 +599,10 @@ const Products = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="w-full max-w-full overflow-hidden">
-              <BarcodeScannerComponent
+              <OptimizedScanner
                 width="100%"
                 height={250}
-                onUpdate={handleScanForNavigation}
+                onScan={(result) => handleScanForNavigation(null, { text: result })}
               />
             </div>
           </DialogContent>
@@ -620,10 +620,10 @@ const Products = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="w-full max-w-full overflow-hidden">
-              <BarcodeScannerComponent
+              <OptimizedScanner
                 width="100%"
                 height={250}
-                onUpdate={handleScanForAddProduct}
+                onScan={(result) => handleScanForAddProduct(null, { text: result })}
               />
             </div>
           </DialogContent>
@@ -641,10 +641,10 @@ const Products = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="w-full max-w-full overflow-hidden">
-              <BarcodeScannerComponent
+              <OptimizedScanner
                 width="100%"
                 height={250}
-                onUpdate={handleScanForAddCaseBarcode}
+                onScan={(result) => handleScanForAddCaseBarcode(null, { text: result })}
               />
             </div>
           </DialogContent>

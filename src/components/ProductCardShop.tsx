@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import BarcodeScanner from "react-qr-barcode-scanner"; // Make sure this is installed
+import { OptimizedScanner } from "@/components/OptimizedScanner";
 import { toast } from "sonner";
 
 interface ProductCardProps {
@@ -164,12 +164,10 @@ export const ProductCardshop = ({
           <ScrollArea className="max-h-[65vh] pr-3">
             {/* Smaller, responsive barcode scanner */}
             <div className="w-full h-40 mb-4 overflow-hidden rounded-md border">
-              <BarcodeScanner
-                onUpdate={(err, result) => {
-                  if (result) setBarcodeValue(result.text);
-                }}
-                delay={500}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              <OptimizedScanner
+                width="100%"
+                height="100%"
+                onScan={(result) => setBarcodeValue(result)}
               />
             </div>
             

@@ -6,7 +6,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Upload, ScanLine, X } from "lucide-react";
-import BarcodeScanner from "react-qr-barcode-scanner";
+import { OptimizedScanner } from "@/components/OptimizedScanner";
 import { ShopAvailability } from "@/components/ShopAvailability";
 import { TopLoadingBar } from "@/components/TopLoadingBar";
 import { toast as sonnerToast } from "sonner";
@@ -600,11 +600,10 @@ const ProductDetail = () => {
                   
                   {isScannerOpen && (
                     <div className="w-full h-64 mb-4 overflow-hidden rounded-md border">
-                      <BarcodeScanner
-                        onUpdate={handleScanResult}
-                        delay={500}
+                      <OptimizedScanner
                         width="100%"
                         height="100%"
+                        onScan={(result) => handleScanResult(null, { text: result })}
                       />
                     </div>
                   )}
