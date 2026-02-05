@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { chatService, Chat as ChatType, Message } from "@/services/chatService";
 import { useToast } from "@/hooks/use-toast";
 import socketService from "@/services/socketService";
+import { fuzzyFilter } from "@/utils/fuzzySearch";
 
 // Mock data - replace with real API calls
 const mockChats = [
@@ -285,9 +286,7 @@ const Chat = () => {
     });
   };
 
-  const filteredChats = chats.filter(chat =>
-    chat.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredChats = fuzzyFilter(chats, searchQuery, (chat) => chat.name);
 
   if (loading) {
     return (

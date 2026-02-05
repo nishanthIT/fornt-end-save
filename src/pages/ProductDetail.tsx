@@ -5,7 +5,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Upload, ScanLine, X } from "lucide-react";
+import { ArrowLeft, Upload, ScanLine, X, Trash2, AlertTriangle } from "lucide-react";
 import { OptimizedScanner } from "@/components/OptimizedScanner";
 import { ShopAvailability } from "@/components/ShopAvailability";
 import { TopLoadingBar } from "@/components/TopLoadingBar";
@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -32,6 +33,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { getImageUrl } from "@/utils/imageUtils";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Form validation schema
 const productSchema = z.object({
@@ -48,7 +50,10 @@ const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [product, setProduct] = useState(null);
@@ -56,6 +61,8 @@ const ProductDetail = () => {
   const [error, setError] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(false);
   const fileInputRef = useRef(null);
+  
+  const isAdmin = user?.userType === 'ADMIN';
   
   // Barcode scanner states
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -351,6 +358,41 @@ const ProductDetail = () => {
     }
   };
 
+  // Delete product (Admin only)
+  const handleDeleteProduct = async () => {
+    if (!product?.id) return;
+    
+    setIsDeleting(true);
+    try {
+      const authToken = localStorage.getItem("auth_token");
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/deleteProduct/${product.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken && { Authorization: `Bearer ${authToken}` }),
+          },
+          credentials: 'include'
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete product");
+      }
+
+      sonnerToast.success("Product deleted successfully");
+      setIsDeleteDialogOpen(false);
+      navigate("/products");
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      sonnerToast.error(error.message || "Failed to delete product");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -387,17 +429,18 @@ const ProductDetail = () => {
             <Badge>{product.category}</Badge>
             <div className="flex justify-between items-center">
               <h1 className="text-4xl font-bold">{product.title}</h1>
-              <Dialog open={isEditing} onOpenChange={setIsEditing}>
-                <DialogTrigger asChild>
-                  <Button>Edit Product</Button>
-                </DialogTrigger>
+              <div className="flex gap-2">
+                <Dialog open={isEditing} onOpenChange={setIsEditing}>
+                  <DialogTrigger asChild>
+                    <Button>Edit Product</Button>
+                  </DialogTrigger>
 
-                {/* Scrollable Modal */}
-                <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Edit Product Details</DialogTitle>
-                    <DialogDescription>
-                      Make changes to the product details here.
+                  {/* Scrollable Modal */}
+                  <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Edit Product Details</DialogTitle>
+                      <DialogDescription>
+                        Make changes to the product details here.
                     </DialogDescription>
                   </DialogHeader>
                   <Form {...form}>
@@ -615,6 +658,46 @@ const ProductDetail = () => {
                   </div>
                 </DialogContent>
               </Dialog>
+
+              {/* Delete Product Button - Admin Only */}
+              {isAdmin && (
+                <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="destructive">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Product
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2 text-red-600">
+                        <AlertTriangle className="h-5 w-5" />
+                        Delete Product
+                      </DialogTitle>
+                      <DialogDescription>
+                        Are you sure you want to delete <strong>{product?.title}</strong>? This action cannot be undone and will remove this product from all shops and customer lists.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsDeleteDialogOpen(false)}
+                        disabled={isDeleting}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteProduct}
+                        disabled={isDeleting}
+                      >
+                        {isDeleting ? "Deleting..." : "Delete Product"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+              </div>
             </div>
             <p className="text-muted-foreground">{product.description}</p>
 

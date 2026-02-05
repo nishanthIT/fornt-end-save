@@ -336,7 +336,6 @@ const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [userType, setUserType] = useState<"ADMIN" | "EMPLOYEE" | "CUSTOMER">("ADMIN");
   const [isLoading, setIsLoading] = useState(false);
   
   // Handle redirection based on user type
@@ -368,9 +367,10 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      await login(email, password, userType);
+      // Backend auto-detects user type based on which table the user exists in
+      await login(email, password, "ADMIN"); // This parameter is ignored by backend
       
-      console.log(`Login successful as ${userType}, redirecting...`);
+      console.log(`Login successful, redirecting...`);
       
       toast({
         title: "Login Successful",
@@ -423,22 +423,6 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="userType">User Type</Label>
-              <Select 
-                value={userType} 
-                onValueChange={(value) => setUserType(value as "ADMIN" | "EMPLOYEE" | "CUSTOMER")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select user type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ADMIN">Admin</SelectItem>
-                  <SelectItem value="EMPLOYEE">Employee</SelectItem>
-                  <SelectItem value="CUSTOMER">Customer</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </CardContent>
           <CardFooter>

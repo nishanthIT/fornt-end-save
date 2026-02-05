@@ -26,6 +26,7 @@ import { OptimizedScanner } from "@/components/OptimizedScanner";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { getImageUrl } from "@/utils/imageUtils";
+import { fuzzyFilter } from "@/utils/fuzzySearch";
 
 const ShopDetail = () => {
   const { id } = useParams();
@@ -46,6 +47,7 @@ const ShopDetail = () => {
   const [imageName, setImageName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [showProductBarcodeScanner, setShowProductBarcodeScanner] = useState(false);
   
   // UI states
   const [activeTab, setActiveTab] = useState("availableProducts");
@@ -63,9 +65,32 @@ const ShopDetail = () => {
   const [showAddProductScanner, setShowAddProductScanner] = useState(false);
   const [showProductNotFoundDialog, setShowProductNotFoundDialog] = useState(false);
   const [notFoundProductName, setNotFoundProductName] = useState("");
+  const [showSearchScanner, setShowSearchScanner] = useState(false);
+  const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
   
   // Force refresh state
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Helper function to format price input (456 -> 4.56, 45 -> 0.45, 1 -> 0.01)
+  const formatPriceInput = (value: string): string => {
+    // Remove any non-digit characters
+    const digits = value.replace(/\D/g, '');
+    if (!digits) return '';
+    
+    // Convert to number and divide by 100 to get pounds
+    const pence = parseInt(digits, 10);
+    const pounds = (pence / 100).toFixed(2);
+    return pounds;
+  };
+
+  // Handle price input change - stores raw digits, displays formatted
+  const handlePriceChange = (value: string, setter: (val: string) => void) => {
+    // If user is typing, just store the raw input temporarily
+    // Remove any non-digit characters except decimal point
+    const cleanValue = value.replace(/[^0-9]/g, '');
+    const formatted = formatPriceInput(cleanValue);
+    setter(formatted);
+  };
   
   // Use the custom hooks to fetch products
   const { products: fetchedProducts, loading, error } = useFetchProducts(searchQuery);
@@ -156,6 +181,49 @@ const ShopDetail = () => {
       toast.warning("An error occurred. Please try again later.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Function to handle barcode scan in search tab
+  const handleSearchBarcodeScan = async (scannedBarcode: string) => {
+    setShowSearchScanner(false);
+    setIsSearchingBarcode(true);
+    
+    try {
+      const authToken = localStorage.getItem("auth_token");
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/getProductByBarcode/${scannedBarcode}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken && { Authorization: `Bearer ${authToken}` }),
+          },
+          credentials: 'include'
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          // Product found - open the add product dialog
+          toast.success(`Product found: ${result.data.title}`);
+          openAddProductDialog(result.data);
+        }
+      } else if (response.status === 404) {
+        // Product not found - automatically open add new product dialog
+        toast.info("Product not found - Add it as a new product");
+        setBarcode(scannedBarcode); // Pre-fill the barcode for new product
+        // Automatically open the add new product dialog
+        (document.querySelector('[data-trigger="add-new-product"]') as HTMLElement)?.click();
+      } else {
+        toast.error("Error searching for product");
+      }
+    } catch (error) {
+      console.error("Error searching by barcode:", error);
+      toast.error("Error searching for product");
+    } finally {
+      setIsSearchingBarcode(false);
     }
   };
 
@@ -286,8 +354,8 @@ const ShopDetail = () => {
   };
 
   const filteredProducts = products && products.length > 0
-    ? products.filter((product) =>
-        product.title.toLowerCase().includes(searchQuery.toLowerCase())
+    ? fuzzyFilter(products, searchQuery, (product) => 
+        `${product.title} ${product.barcode || ''} ${product.caseBarcode || ''}`
       )
     : [];
 
@@ -316,19 +384,51 @@ const ShopDetail = () => {
                   <DialogTitle>Add New Product</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
-                  {/* Barcode Scanner */}
+                  {/* Product Barcode - Required with Scanner */}
                   <div className="space-y-2">
-                    <label className="block font-semibold">Case Barcode</label>
                     <div className="flex space-x-2">
-                      <Button className="w-full" variant="outline" onClick={() => setShowScanner(!showScanner)}>
+                      <Button className="flex-shrink-0" variant="outline" onClick={() => setShowProductBarcodeScanner(!showProductBarcodeScanner)}>
                         <Barcode className="mr-2 h-4 w-4" />
-                        {showScanner ? "Close Scanner" : "Scan"}
+                        {showProductBarcodeScanner ? "Close" : "Scan"}
+                      </Button>
+                      <Input 
+                        type="text" 
+                        placeholder="Product Barcode *" 
+                        value={barcode} 
+                        onChange={(e) => setBarcode(e.target.value)} 
+                        className="flex-1"
+                      />
+                    </div>
+                    {showProductBarcodeScanner && (
+                      <div className="border rounded-lg p-2">
+                        <OptimizedScanner
+                          width={300}
+                          height={200}
+                          onScan={(result) => {
+                            setBarcode(result);
+                            setShowProductBarcodeScanner(false);
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Title - Required */}
+                  <Input placeholder="Product Name *" value={title} onChange={(e) => setTitle(e.target.value)} />
+
+                  {/* Case Barcode Scanner */}
+                  <div className="space-y-2">
+                    <div className="flex space-x-2">
+                      <Button className="flex-shrink-0" variant="outline" onClick={() => setShowScanner(!showScanner)}>
+                        <Barcode className="mr-2 h-4 w-4" />
+                        {showScanner ? "Close" : "Scan"}
                       </Button>
                       <Input
                         type="text"
-                        placeholder="Enter Barcode"
+                        placeholder="Case Barcode"
                         value={caseBarcode}
                         onChange={(e) => setCaseBarcode(e.target.value)}
+                        className="flex-1"
                       />
                     </div>
                     {showScanner && (
@@ -336,37 +436,62 @@ const ShopDetail = () => {
                         <OptimizedScanner
                           width={300}
                           height={200}
-                          onScan={(result) => setCaseBarcode(result)}
+                          onScan={(result) => {
+                            setCaseBarcode(result);
+                            setShowScanner(false);
+                          }}
                         />
                       </div>
                     )}
                   </div>
 
-                  {/* Product barcode field */}
-                  <div className="space-y-2">
-                    <label className="block font-semibold">Product Barcode</label>
+                  {/* Case Size */}
+                  <div className="space-y-1">
+                    <label className="text-sm text-muted-foreground">Case Size (default: 1)</label>
+                    <Input type="text" placeholder="Enter Case Size" value={caseSize} onChange={(e) => setCaseSize(e.target.value)} />
+                  </div>
+
+                  {/* Packet Size */}
+                  <div className="space-y-1">
+                    <label className="text-sm text-muted-foreground">Packet Size (default: 1)</label>
+                    <Input type="text" placeholder="Enter Packet Size" value={packetSize} onChange={(e) => setPacketSize(e.target.value)} />
+                  </div>
+
+                  {/* Retail Size */}
+                  <Input type="text" placeholder="Retail Size" value={retailSize} onChange={(e) => setRetailSize(e.target.value)} />
+
+                  {/* Price */}
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
                     <Input 
                       type="text" 
-                      placeholder="Product Barcode" 
-                      value={barcode} 
-                      onChange={(e) => setBarcode(e.target.value)} 
+                      placeholder="Price (e.g. 456 = £4.56)" 
+                      value={price} 
+                      onChange={(e) => handlePriceChange(e.target.value, setPrice)}
+                      className="pl-7"
                     />
                   </div>
 
-                  {/* Other Fields */}
-                  <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-                  <Input type="text" placeholder="Case Size (default: 1)" value={caseSize} onChange={(e) => setCaseSize(e.target.value)} />
-                  <Input type="text" placeholder="Packet Size (default: 1)" value={packetSize} onChange={(e) => setPacketSize(e.target.value)} />
-                  <Input type="text" placeholder="Retail Size" value={retailSize} onChange={(e) => setRetailSize(e.target.value)} required/>
-                  <Input type="number" placeholder="Price" value={price} onChange={(e) => setPrice(e.target.value)} required/>
-                  <Input type="text" placeholder="Aiel no" value={Aiel} onChange={(e) => setAiel(e.target.value)} required />
-                  <Input type="text" placeholder="RRP (optional)" value={rrp} onChange={(e) => setRrp(e.target.value)} /> 
+                  {/* Aiel No */}
+                  <Input type="text" placeholder="Aiel No" value={Aiel} onChange={(e) => setAiel(e.target.value)} />
+
+                  {/* RRP */}
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                    <Input 
+                      type="text" 
+                      placeholder="RRP (e.g. 599 = £5.99)" 
+                      value={rrp} 
+                      onChange={(e) => handlePriceChange(e.target.value, setRrp)}
+                      className="pl-7"
+                    />
+                  </div>
 
                   {/* Add Product Button */}
                   <Button 
                     className="w-full" 
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !barcode || !title}
                     onClick={handleAddProduct}
                   >
                     {isSubmitting ? "Adding Product..." : "Add Product"}
@@ -419,13 +544,46 @@ const ShopDetail = () => {
       {/* Search & Add Products Tab */}
       {activeTab === "search" && (
         <>
-          <div className="mb-4 sm:mb-8">
-            <Input
-              placeholder="Search for a product to add..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full"
-            />
+          <div className="mb-4 sm:mb-8 space-y-3">
+            {/* Search Input with Scan Button */}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search by name or barcode..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1"
+              />
+              <Button 
+                variant="outline" 
+                onClick={() => setShowSearchScanner(!showSearchScanner)}
+                className="flex-shrink-0"
+                disabled={isSearchingBarcode}
+              >
+                <Barcode className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">{showSearchScanner ? "Close" : "Scan"}</span>
+              </Button>
+            </div>
+            
+            {/* Barcode Scanner */}
+            {showSearchScanner && (
+              <div className="border rounded-lg p-3 bg-muted/30">
+                <p className="text-sm text-muted-foreground mb-2 text-center">Scan a product barcode to find and add it</p>
+                <div className="flex justify-center">
+                  <OptimizedScanner
+                    width={300}
+                    height={200}
+                    onScan={handleSearchBarcodeScan}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Loading state for barcode search */}
+            {isSearchingBarcode && (
+              <div className="text-center py-4">
+                <p className="text-muted-foreground">Searching for product...</p>
+              </div>
+            )}
           </div>
           {loading && <p>Loading...</p>}
           {error && <p className="text-red-500">{error}</p>}
@@ -584,13 +742,17 @@ const ShopDetail = () => {
             {/* Required fields for adding existing product */}
             <div className="space-y-2">
               <label className="block font-semibold">Price</label>
-              <Input
-                type="number"
-                placeholder="Enter Price"
-                value={addProductPrice}
-                onChange={(e) => setAddProductPrice(e.target.value)}
-                required
-              />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                <Input
+                  type="text"
+                  placeholder="e.g. 456 = £4.56"
+                  value={addProductPrice}
+                  onChange={(e) => handlePriceChange(e.target.value, setAddProductPrice)}
+                  className="pl-7"
+                  required
+                />
+              </div>
             </div>
             
             <div className="space-y-2">
@@ -605,12 +767,16 @@ const ShopDetail = () => {
             
             <div className="space-y-2">
               <label className="block font-semibold">RRP</label>
-              <Input
-                type="number"
-                placeholder="Enter RRP"
-                value={addProductRrp}
-                onChange={(e) => setAddProductRrp(e.target.value)}
-              />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                <Input
+                  type="text"
+                  placeholder="e.g. 599 = £5.99"
+                  value={addProductRrp}
+                  onChange={(e) => handlePriceChange(e.target.value, setAddProductRrp)}
+                  className="pl-7"
+                />
+              </div>
             </div>
             
             <div className="space-y-2">

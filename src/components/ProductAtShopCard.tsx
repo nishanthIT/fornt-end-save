@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Calendar, Tag, DollarSign, Clock } from "lucide-react";
+import { Calendar, Tag, Clock, PoundSterling } from "lucide-react";
 
 interface ProductAtShopCardProps {
   productId: string;
@@ -45,6 +45,25 @@ const formatDate = (dateString: string) => {
   });
 };
 
+// Helper function to format price input (456 -> 4.56, 45 -> 0.45, 1 -> 0.01)
+const formatPriceInput = (value: string): string => {
+  // Remove any non-digit characters
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  
+  // Convert to number and divide by 100 to get pounds
+  const pence = parseInt(digits, 10);
+  const pounds = (pence / 100).toFixed(2);
+  return pounds;
+};
+
+// Handle price input change
+const handlePriceInputChange = (value: string, setter: (val: string) => void) => {
+  const cleanValue = value.replace(/[^0-9]/g, '');
+  const formatted = formatPriceInput(cleanValue);
+  setter(formatted);
+};
+
 export const ProductAtShopCard = ({
   productId,
   shopId,
@@ -67,7 +86,7 @@ export const ProductAtShopCard = ({
   const [editPrice, setEditPrice] = useState(price.toString());
   const [editOfferPrice, setEditOfferPrice] = useState(offerPrice?.toString() || "");
   const [editOfferExpiryDate, setEditOfferExpiryDate] = useState(
-    offerExpiryDate ? new Date(offerExpiryDate).toISOString().slice(0, 16) : ""
+    offerExpiryDate ? new Date(offerExpiryDate).toISOString().slice(0, 10) : ""
   );
 
   const fallbackImg = "https://via.placeholder.com/64";
@@ -80,14 +99,17 @@ export const ProductAtShopCard = ({
     setEditPrice(price.toString());
     setEditOfferPrice(offerPrice?.toString() || "");
     setEditOfferExpiryDate(
-      offerExpiryDate ? new Date(offerExpiryDate).toISOString().slice(0, 16) : ""
+      offerExpiryDate ? new Date(offerExpiryDate).toISOString().slice(0, 10) : ""
     );
   }, [price, offerPrice, offerExpiryDate]);
 
   const handleSave = () => {
     const newPrice = parseFloat(editPrice);
     const newOfferPrice = editOfferPrice && editOfferPrice.trim() !== '' ? parseFloat(editOfferPrice) : null;
-    const newOfferExpiryDate = editOfferExpiryDate && editOfferExpiryDate.trim() !== '' ? editOfferExpiryDate : null;
+    // Set expiry time to end of day (23:59:59)
+    const newOfferExpiryDate = editOfferExpiryDate && editOfferExpiryDate.trim() !== '' 
+      ? `${editOfferExpiryDate}T23:59:59` 
+      : null;
 
     console.log('Saving price changes:', {
       productId,
@@ -123,10 +145,15 @@ export const ProductAtShopCard = ({
       return;
     }
 
-    // Validate that expiry date is in the future
-    if (newOfferExpiryDate && new Date(newOfferExpiryDate) <= new Date()) {
-      alert('Offer expiry date must be in the future');
-      return;
+    // Validate that expiry date is today or in the future
+    if (newOfferExpiryDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const expiryDate = new Date(editOfferExpiryDate);
+      if (expiryDate < today) {
+        alert('Offer expiry date must be today or in the future');
+        return;
+      }
     }
 
     console.log('Calling onOfferUpdate with:', {
@@ -206,7 +233,7 @@ export const ProductAtShopCard = ({
                 {/* Price Display */}
                 <div className="text-left sm:text-right w-full sm:w-auto">
                   <div className="flex items-center gap-2 justify-start sm:justify-end">
-                    <DollarSign className={`h-3 w-3 sm:h-4 sm:w-4 ${hasActiveOffer ? 'text-orange-600' : 'text-green-600'}`} />
+                    <PoundSterling className={`h-3 w-3 sm:h-4 sm:w-4 ${hasActiveOffer ? 'text-orange-600' : 'text-green-600'}`} />
                     <span className={`text-base sm:text-lg font-bold ${hasActiveOffer ? 'text-orange-600' : 'text-green-600'}`}>
                       £{currentPrice.toFixed(2)}
                     </span>
@@ -261,29 +288,33 @@ export const ProductAtShopCard = ({
                 {/* Edit Form */}
                 <div className="space-y-2 w-full sm:min-w-48">
                   <div>
-                    <label className="text-xs text-gray-600">Regular Price (£)</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={editPrice}
-                      onChange={(e) => setEditPrice(e.target.value)}
-                      className="w-full"
-                      placeholder="Regular price"
-                    />
+                    <label className="text-xs text-gray-600">Regular Price (e.g. 456 = £4.56)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                      <Input
+                        type="text"
+                        value={editPrice}
+                        onChange={(e) => handlePriceInputChange(e.target.value, setEditPrice)}
+                        className="w-full pl-7"
+                        placeholder="e.g. 456 = £4.56"
+                      />
+                    </div>
                   </div>
                   
                   <div>
                     <label className="text-xs text-gray-600">
-                      Offer Price (£) {hasActiveOffer ? '- Currently Active' : '- Optional'}
+                      Offer Price {hasActiveOffer ? '- Currently Active' : '- Optional'}
                     </label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={editOfferPrice}
-                      onChange={(e) => setEditOfferPrice(e.target.value)}
-                      className={`w-full ${hasActiveOffer ? 'border-orange-400 bg-orange-50' : ''}`}
-                      placeholder="Offer price"
-                    />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                      <Input
+                        type="text"
+                        value={editOfferPrice}
+                        onChange={(e) => handlePriceInputChange(e.target.value, setEditOfferPrice)}
+                        className={`w-full pl-7 ${hasActiveOffer ? 'border-orange-400 bg-orange-50' : ''}`}
+                        placeholder="e.g. 399 = £3.99"
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -291,7 +322,7 @@ export const ProductAtShopCard = ({
                       Offer Expires {hasActiveOffer ? '- Currently Active' : ''}
                     </label>
                     <Input
-                      type="datetime-local"
+                      type="date"
                       value={editOfferExpiryDate}
                       onChange={(e) => setEditOfferExpiryDate(e.target.value)}
                       className={`w-full ${hasActiveOffer ? 'border-orange-400 bg-orange-50' : ''}`}

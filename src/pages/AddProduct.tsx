@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProductCard } from "@/components/ProductCard";
 import { Search, Barcode, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { fuzzyFilter } from "@/utils/fuzzySearch";
 
 // Mock data - replace with actual API calls later
 const mockProducts = [
@@ -38,8 +39,8 @@ const AddProduct = () => {
     price: "",
   });
 
-  const filteredProducts = mockProducts.filter((product) =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredProducts = fuzzyFilter(mockProducts, searchQuery, (product) => 
+    `${product.name} ${product.category}`
   );
 
   const handleAddExisting = (productId: number) => {

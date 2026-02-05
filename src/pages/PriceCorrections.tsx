@@ -339,12 +339,7 @@ const PriceCorrections: React.FC = () => {
         {/* Actions for Pending Reports */}
         {showActions && report.status === 'PENDING' && (
           <div className="flex gap-2">
-            <Dialog onOpenChange={(open) => {
-              if (open) {
-                setSelectedReport(report);
-                setAdminNotes('Report approved - price looks correct');
-              }
-            }}>
+            <Dialog>
               <DialogTrigger asChild>
                 <Button 
                   className="flex-1" 
@@ -363,18 +358,21 @@ const PriceCorrections: React.FC = () => {
                 </DialogHeader>
                 <div className="space-y-4">
                   <Textarea
-                    value={adminNotes}
+                    defaultValue="Report approved - price looks correct"
                     onChange={(e) => setAdminNotes(e.target.value)}
                     placeholder="Add approval notes..."
                     rows={3}
                   />
                   <div className="flex gap-2">
                     <Button 
-                      onClick={() => selectedReport && approveReport(selectedReport.id, adminNotes)}
+                      onClick={() => {
+                        console.log('Approving report:', report.id);
+                        approveReport(report.id, adminNotes || 'Report approved - price looks correct');
+                      }}
                       className="flex-1"
-                      disabled={processingId === selectedReport?.id}
+                      disabled={processingId === report.id}
                     >
-                      {processingId === selectedReport?.id ? (
+                      {processingId === report.id ? (
                         <RefreshCw size={16} className="mr-2 animate-spin" />
                       ) : (
                         <CheckCircle size={16} className="mr-2" />
@@ -389,12 +387,7 @@ const PriceCorrections: React.FC = () => {
               </DialogContent>
             </Dialog>
             
-            <Dialog onOpenChange={(open) => {
-              if (open) {
-                setSelectedReport(report);
-                setAdminNotes('Report rejected - price appears incorrect');
-              }
-            }}>
+            <Dialog>
               <DialogTrigger asChild>
                 <Button 
                   variant="destructive" 
@@ -414,7 +407,7 @@ const PriceCorrections: React.FC = () => {
                 </DialogHeader>
                 <div className="space-y-4">
                   <Textarea
-                    value={adminNotes}
+                    defaultValue="Report rejected - price appears incorrect"
                     onChange={(e) => setAdminNotes(e.target.value)}
                     placeholder="Add rejection reason..."
                     rows={3}
@@ -422,11 +415,14 @@ const PriceCorrections: React.FC = () => {
                   <div className="flex gap-2">
                     <Button 
                       variant="destructive"
-                      onClick={() => selectedReport && rejectReport(selectedReport.id, adminNotes)}
+                      onClick={() => {
+                        console.log('Rejecting report:', report.id);
+                        rejectReport(report.id, adminNotes || 'Report rejected - price appears incorrect');
+                      }}
                       className="flex-1"
-                      disabled={processingId === selectedReport?.id}
+                      disabled={processingId === report.id}
                     >
-                      {processingId === selectedReport?.id ? (
+                      {processingId === report.id ? (
                         <RefreshCw size={16} className="mr-2 animate-spin" />
                       ) : (
                         <XCircle size={16} className="mr-2" />

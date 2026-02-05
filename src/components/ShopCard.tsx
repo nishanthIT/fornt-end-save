@@ -1,7 +1,6 @@
 
 
-
-import { Store, Phone, MapPin, Edit, Trash } from "lucide-react";
+import { Store, Phone, MapPin, Edit, Trash, AlertTriangle } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,10 +9,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Shop {
   id: string;  // id should be a string according to Prisma
@@ -31,7 +33,11 @@ interface ShopCardProps {
 
 export const ShopCard = ({ shop, onClick, onDelete, onUpdate }: ShopCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editedShop, setEditedShop] = useState(shop);
+  const { user } = useAuth();
+  
+  const isAdmin = user?.userType === 'ADMIN';
 
 const authToken = localStorage.getItem("auth_token");
   const handleSave = async () => {
@@ -111,19 +117,49 @@ const authToken = localStorage.getItem("auth_token");
                 </div>
               </DialogContent>
             </Dialog>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-10"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirm("Are you sure you want to delete this shop?")) {
-                  onDelete(shop.id);
-                }
-              }}
-            >
-              <Trash className="h-4 w-4 text-red-600" />
-            </Button>
+            {/* Only show delete button for Admin users */}
+            {isAdmin && (
+              <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-10"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Trash className="h-4 w-4 text-red-600" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent onClick={(e) => e.stopPropagation()}>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-red-600">
+                      <AlertTriangle className="h-5 w-5" />
+                      Delete Shop
+                    </DialogTitle>
+                    <DialogDescription>
+                      Are you sure you want to delete <strong>{shop.name}</strong>? This action cannot be undone and will remove all products associated with this shop.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter className="gap-2 sm:gap-0">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsDeleteDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        onDelete(shop.id);
+                        setIsDeleteDialogOpen(false);
+                      }}
+                    >
+                      Delete Shop
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </div>
       </CardHeader>
