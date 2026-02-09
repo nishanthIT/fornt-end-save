@@ -179,202 +179,157 @@ export const ProductAtShopCard = ({
 
   return (
     <Card className={`product-card w-full ${hasActiveOffer ? 'ring-2 ring-orange-400 bg-orange-50' : ''}`}>
-      <CardContent className="p-4">
+      <CardContent className="p-3 sm:p-4">
         {hasActiveOffer && (
-          <div className="flex items-center gap-2 mb-3 text-orange-600">
-            <Tag className="h-4 w-4" />
-            <span className="text-sm font-medium">🔥 SPECIAL OFFER ACTIVE</span>
-            <Badge variant="destructive" className="text-xs">
-              {daysRemaining > 0 ? `${daysRemaining} days left` : 'Expires today'}
+          <div className="flex items-center gap-1.5 mb-2 text-orange-600">
+            <Tag className="h-3 w-3 flex-shrink-0" />
+            <span className="text-xs font-medium">🔥 OFFER</span>
+            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+              {daysRemaining > 0 ? `${daysRemaining}d left` : 'Today'}
             </Badge>
           </div>
         )}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-start gap-2">
+          {/* Product Image */}
+          <img
+            src={img ? (Array.isArray(img) ? img[0] : img) : fallbackImg}
+            alt={title}
+            className="w-11 h-11 sm:w-14 sm:h-14 object-cover rounded-md flex-shrink-0"
+            loading="lazy"
+          />
+          
           {/* Product Info */}
-          <div className="flex items-center space-x-3 sm:space-x-4 flex-grow min-w-0">
-            <img
-              src={img ? (Array.isArray(img) ? img[0] : img) : fallbackImg}
-              alt={title}
-              className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-md flex-shrink-0"
-              loading="lazy"
-            />
-            <div className="flex-grow min-w-0">
-              <h3 className="text-sm sm:text-lg font-semibold truncate">{title}</h3>
-              <div className="flex flex-wrap gap-1 sm:gap-2 mt-1 text-xs sm:text-sm text-gray-600">
-                <span>Case: {caseSize}</span>
-                <span className="hidden sm:inline">•</span>
-                <span>Packet: {packetSize}</span>
-                <span className="hidden sm:inline">•</span>
-                <span>Retail: {retailSize}</span>
-                {aiel && (
-                  <>
-                    <span className="hidden sm:inline">•</span>
-                    <span>Aile: {aiel}</span>
-                  </>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1 sm:gap-2 mt-1">
-                <Badge variant="secondary" className="text-xs px-1 py-0">
-                  {barcode}
-                </Badge>
-                {caseBarcode && (
-                  <Badge variant="outline" className="text-xs px-1 py-0">
-                    Case: {caseBarcode}
-                  </Badge>
-                )}
-              </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm sm:text-base font-semibold truncate pr-1">{title}</h3>
+            <div className="flex flex-wrap gap-x-1.5 gap-y-0 mt-0.5 text-[10px] sm:text-xs text-gray-600">
+              <span>Case:{caseSize}</span>
+              <span>Pkt:{packetSize}</span>
+              <span>Rtl:{retailSize}</span>
+              {aiel && <span>Aisle:{aiel}</span>}
+            </div>
+            {/* Barcodes inline */}
+            <div className="flex flex-wrap gap-1 mt-0.5">
+              <span className="text-[9px] text-gray-500">{barcode}</span>
+              {caseBarcode && <span className="text-[9px] text-gray-400">| {caseBarcode}</span>}
             </div>
           </div>
-
-          {/* Price and Offer Section */}
-          <div className="flex flex-col sm:items-end space-y-2 min-w-0 w-full sm:w-auto">
-            {!isEditing ? (
-              <>
-                {/* Price Display */}
-                <div className="text-left sm:text-right w-full sm:w-auto">
-                  <div className="flex items-center gap-2 justify-start sm:justify-end">
-                    <PoundSterling className={`h-3 w-3 sm:h-4 sm:w-4 ${hasActiveOffer ? 'text-orange-600' : 'text-green-600'}`} />
-                    <span className={`text-base sm:text-lg font-bold ${hasActiveOffer ? 'text-orange-600' : 'text-green-600'}`}>
-                      £{currentPrice.toFixed(2)}
-                    </span>
-                    {hasActiveOffer && (
-                      <Badge variant="destructive" className="text-xs animate-pulse">
-                        OFFER
-                      </Badge>
-                    )}
-                  </div>
-                  {hasActiveOffer && (
-                    <div className="text-xs sm:text-sm text-gray-500 line-through">
-                      Was: £{price.toFixed(2)}
-                    </div>
-                  )}
-                  {rrp && (
-                    <div className="text-xs text-gray-400">
-                      RRP: £{rrp.toFixed(2)}
-                    </div>
-                  )}
+          
+          {/* Price + Edit - Right column */}
+          {!isEditing && (
+            <div className="text-right flex-shrink-0 flex flex-col items-end">
+              <span className={`text-base sm:text-lg font-bold ${hasActiveOffer ? 'text-orange-600' : 'text-green-600'}`}>
+                £{currentPrice.toFixed(2)}
+              </span>
+              {hasActiveOffer && (
+                <div className="text-[9px] text-gray-500 line-through">
+                  Was: £{price.toFixed(2)}
                 </div>
-
-                {/* Offer Status */}
-                {hasActiveOffer && (
-                  <div className="text-left sm:text-center w-full sm:w-auto">
-                    <Badge variant="destructive" className="mb-1">
-                      <Tag className="h-3 w-3 mr-1" />
-                      OFFER
-                    </Badge>
-                    <div className="text-xs text-orange-600 flex items-center gap-1 justify-start sm:justify-center">
-                      <Clock className="h-3 w-3" />
-                      {daysRemaining > 0 ? `${daysRemaining} days left` : 'Expires today'}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Until: {formatDate(offerExpiryDate!)}
-                    </div>
-                  </div>
-                )}
-
-                {/* Edit Button */}
-                <Button
-                  variant={hasActiveOffer ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setIsEditing(true)}
-                  className={`mt-2 w-full sm:w-auto ${hasActiveOffer ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
-                >
-                  <span className="hidden sm:inline">{hasActiveOffer ? 'Edit Offer' : 'Edit Price'}</span>
-                  <span className="sm:hidden">Edit</span>
-                </Button>
-              </>
-            ) : (
-              <>
-                {/* Edit Form */}
-                <div className="space-y-2 w-full sm:min-w-48">
-                  <div>
-                    <label className="text-xs text-gray-600">Regular Price (e.g. 456 = £4.56)</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
-                      <Input
-                        type="text"
-                        value={editPrice}
-                        onChange={(e) => handlePriceInputChange(e.target.value, setEditPrice)}
-                        className="w-full pl-7"
-                        placeholder="e.g. 456 = £4.56"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs text-gray-600">
-                      Offer Price {hasActiveOffer ? '- Currently Active' : '- Optional'}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
-                      <Input
-                        type="text"
-                        value={editOfferPrice}
-                        onChange={(e) => handlePriceInputChange(e.target.value, setEditOfferPrice)}
-                        className={`w-full pl-7 ${hasActiveOffer ? 'border-orange-400 bg-orange-50' : ''}`}
-                        placeholder="e.g. 399 = £3.99"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-gray-600">
-                      Offer Expires {hasActiveOffer ? '- Currently Active' : ''}
-                    </label>
-                    <Input
-                      type="date"
-                      value={editOfferExpiryDate}
-                      onChange={(e) => setEditOfferExpiryDate(e.target.value)}
-                      className={`w-full ${hasActiveOffer ? 'border-orange-400 bg-orange-50' : ''}`}
-                    />
-                  </div>
-
-                  {hasActiveOffer && (
-                    <div className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to clear this offer?')) {
-                            setEditOfferPrice("");
-                            setEditOfferExpiryDate("");
-                            // Immediately save the changes to clear the offer
-                            const newPrice = parseFloat(editPrice);
-                            if (!isNaN(newPrice) && newPrice > 0) {
-                              onOfferUpdate(productId, newPrice, null, null);
-                              setIsEditing(false);
-                            }
-                          }
-                        }}
-                        className="text-red-600 hover:text-red-800 text-xs"
-                      >
-                        Clear Offer
-                      </Button>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCancel}
-                      className="flex-1"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleSave}
-                      className="flex-1"
-                    >
-                      Save
-                    </Button>
-                  </div>
+              )}
+              {rrp && (
+                <div className="text-[9px] text-gray-400">
+                  RRP: £{rrp.toFixed(2)}
                 </div>
-              </>
-            )}
-          </div>
+              )}
+              <Button
+                variant={hasActiveOffer ? "default" : "outline"}
+                size="sm"
+                onClick={() => setIsEditing(true)}
+                className={`mt-1 h-5 px-2 text-[10px] ${hasActiveOffer ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
+              >
+                Edit
+              </Button>
+            </div>
+          )}
         </div>
+
+        {/* Edit Form - Shows when editing */}
+        {isEditing && (
+          <div className="space-y-2 w-full mt-3">
+            <div>
+              <label className="text-xs text-gray-600">Regular Price (e.g. 456 = £4.56)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                <Input
+                  type="text"
+                  value={editPrice}
+                  onChange={(e) => handlePriceInputChange(e.target.value, setEditPrice)}
+                  className="w-full pl-7"
+                  placeholder="e.g. 456 = £4.56"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label className="text-xs text-gray-600">
+                Offer Price {hasActiveOffer ? '- Currently Active' : '- Optional'}
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                <Input
+                  type="text"
+                  value={editOfferPrice}
+                  onChange={(e) => handlePriceInputChange(e.target.value, setEditOfferPrice)}
+                  className={`w-full pl-7 ${hasActiveOffer ? 'border-orange-400 bg-orange-50' : ''}`}
+                  placeholder="e.g. 399 = £3.99"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-600">
+                Offer Expires {hasActiveOffer ? '- Currently Active' : ''}
+              </label>
+              <Input
+                type="date"
+                value={editOfferExpiryDate}
+                onChange={(e) => setEditOfferExpiryDate(e.target.value)}
+                className={`w-full ${hasActiveOffer ? 'border-orange-400 bg-orange-50' : ''}`}
+              />
+            </div>
+
+            {hasActiveOffer && (
+              <div className="text-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to clear this offer?')) {
+                      setEditOfferPrice("");
+                      setEditOfferExpiryDate("");
+                      // Immediately save the changes to clear the offer
+                      const newPrice = parseFloat(editPrice);
+                      if (!isNaN(newPrice) && newPrice > 0) {
+                        onOfferUpdate(productId, newPrice, null, null);
+                        setIsEditing(false);
+                      }
+                    }
+                  }}
+                  className="text-red-600 hover:text-red-800 text-xs"
+                >
+                  Clear Offer
+                </Button>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancel}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSave}
+                className="flex-1"
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

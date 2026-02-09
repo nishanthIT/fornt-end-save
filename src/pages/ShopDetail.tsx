@@ -62,6 +62,8 @@ const ShopDetail = () => {
   const [addProductRrp, setAddProductRrp] = useState("");
   const [addProductcaseSize , setAddProductcaseSize ] = useState("");
   const [addProductpacketSize, setAddProductpacketSize] = useState("");
+  const [addProductImage, setAddProductImage] = useState<string | null>(null);
+  const [addProductImageFile, setAddProductImageFile] = useState<File | null>(null);
   const [showAddProductScanner, setShowAddProductScanner] = useState(false);
   const [showProductNotFoundDialog, setShowProductNotFoundDialog] = useState(false);
   const [notFoundProductName, setNotFoundProductName] = useState("");
@@ -236,6 +238,8 @@ const ShopDetail = () => {
     setAddProductRrp(product.rrp || "");
     setAddProductpacketSize(product.packetSize || ""); 
     setAddProductcaseSize(product.caseSize || ""); 
+    setAddProductImage(null);
+    setAddProductImageFile(null);
     setShowAddProductDialog(true);
   };
 
@@ -250,7 +254,7 @@ const ShopDetail = () => {
     setTitle(notFoundProductName);
     setShowProductNotFoundDialog(false);
     // Trigger the add product dialog
-    document.querySelector('[data-trigger="add-new-product"]')?.click();
+    (document.querySelector('[data-trigger="add-new-product"]') as HTMLElement)?.click();
   };
 
   // Function to add existing product from search
@@ -263,41 +267,77 @@ const ShopDetail = () => {
       // Set default values if empty
       const finalRrp = addProductRrp || addProductPrice;
       
-      const productData = {
-        shopId,
-        id: selectedProduct.id,
-        employeeId,
-        casebarcode: addProductCaseBarcode || "",
-        price: parseFloat(addProductPrice) || 0,
-        aiel: addProductAiel || "",
-        rrp: parseFloat(finalRrp) || 0,
-        packetSize,
-        caseSize
-        
-      };
       const authToken = localStorage.getItem("auth_token");
-
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addProductAtShopifExistAtProduct`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authToken && { Authorization: `Bearer ${authToken}` }),
-        },
-        body: JSON.stringify(productData),
-         credentials: 'include'
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        toast.success("Product added to shop successfully");
-        setShowAddProductDialog(false);
+      
+      // If we have an image file, use FormData
+      if (addProductImageFile) {
+        const formData = new FormData();
+        formData.append('shopId', String(shopId));
+        formData.append('id', String(selectedProduct.id));
+        formData.append('employeeId', String(employeeId));
+        formData.append('casebarcode', addProductCaseBarcode || "");
+        formData.append('price', String(parseFloat(addProductPrice) || 0));
+        formData.append('aiel', addProductAiel || "");
+        formData.append('rrp', String(parseFloat(finalRrp) || 0));
+        formData.append('packetSize', String(packetSize));
+        formData.append('caseSize', String(caseSize));
+        formData.append('image', addProductImageFile);
         
-        // Trigger a refresh of products
-        setRefreshTrigger(prev => prev + 1);
-        await refetchProductsAtShop();
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addProductAtShopifExistAtProduct`, {
+          method: "POST",
+          headers: {
+            ...(authToken && { Authorization: `Bearer ${authToken}` }),
+          },
+          body: formData,
+          credentials: 'include'
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          toast.success("Product added to shop successfully");
+          setShowAddProductDialog(false);
+          setAddProductImage(null);
+          setAddProductImageFile(null);
+          setRefreshTrigger(prev => prev + 1);
+          await refetchProductsAtShop();
+        } else {
+          toast.warning(`Error: ${result.error}`);
+        }
       } else {
-        toast.warning(`Error: ${result.error}`);
+        // No image, use JSON
+        const productData = {
+          shopId,
+          id: selectedProduct.id,
+          employeeId,
+          casebarcode: addProductCaseBarcode || "",
+          price: parseFloat(addProductPrice) || 0,
+          aiel: addProductAiel || "",
+          rrp: parseFloat(finalRrp) || 0,
+          packetSize,
+          caseSize
+        };
+
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addProductAtShopifExistAtProduct`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken && { Authorization: `Bearer ${authToken}` }),
+          },
+          body: JSON.stringify(productData),
+          credentials: 'include'
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          toast.success("Product added to shop successfully");
+          setShowAddProductDialog(false);
+          setRefreshTrigger(prev => prev + 1);
+          await refetchProductsAtShop();
+        } else {
+          toast.warning(`Error: ${result.error}`);
+        }
       }
     } catch (error) {
       console.error(error);
@@ -472,8 +512,8 @@ const ShopDetail = () => {
                     />
                   </div>
 
-                  {/* Aiel No */}
-                  <Input type="text" placeholder="Aiel No" value={Aiel} onChange={(e) => setAiel(e.target.value)} />
+                  {/* Aisle No */}
+                  <Input type="text" placeholder="Aisle No" value={Aiel} onChange={(e) => setAiel(e.target.value)} />
 
                   {/* RRP */}
                   <div className="relative">
@@ -485,6 +525,25 @@ const ShopDetail = () => {
                       onChange={(e) => handlePriceChange(e.target.value, setRrp)}
                       className="pl-7"
                     />
+                  </div>
+
+                  {/* Image Upload */}
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted-foreground">Product Image (optional)</label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="flex-1"
+                      />
+                    </div>
+                    {image && (
+                      <div className="mt-2">
+                        <img src={image} alt="Preview" className="w-20 h-20 object-cover rounded-md" />
+                        <p className="text-xs text-muted-foreground mt-1">{imageName}</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Add Product Button */}
@@ -590,37 +649,53 @@ const ShopDetail = () => {
           {!loading && !error && (
             <div className="space-y-3 sm:space-y-4">
               {fetchedProducts && fetchedProducts.length > 0 ? (
-                fetchedProducts.map((product) => (
-                  <div key={product.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
-                    <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
-                      <img
-                        src={getImageUrl(product.img)}
-                        alt={product.title}
-                        className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-md flex-shrink-0"
-                        loading="lazy"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm sm:text-lg font-semibold truncate">{product.title}</h3>
-                        <div className="text-xs sm:text-sm text-gray-500 flex flex-wrap gap-1 sm:gap-2">
-                          <span>Case: {product.caseSize || "N/A"}</span>
-                          <span className="hidden sm:inline">•</span>
-                          <span>Packet: {product.packetSize || "N/A"}</span>
-                          <span className="hidden sm:inline">•</span>
-                          <span>Retail: {product.retailSize || "N/A"}</span>
+                fetchedProducts.map((product) => {
+                  // Check if product is already added to shop
+                  const isAlreadyAdded = products?.some(
+                    (p) => p.barcode === product.barcode || p.productId === product.id
+                  );
+                  
+                  return (
+                    <div key={product.id} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4 ${isAlreadyAdded ? 'bg-green-50 border-green-200' : ''}`}>
+                      <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
+                        <img
+                          src={getImageUrl(product.img)}
+                          alt={product.title}
+                          className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-md flex-shrink-0"
+                          loading="lazy"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm sm:text-lg font-semibold truncate">{product.title}</h3>
+                          <div className="text-xs sm:text-sm text-gray-500 flex flex-wrap gap-1 sm:gap-2">
+                            <span>Case: {product.caseSize || "N/A"}</span>
+                            <span className="hidden sm:inline">•</span>
+                            <span>Packet: {product.packetSize || "N/A"}</span>
+                            <span className="hidden sm:inline">•</span>
+                            <span>Retail: {product.retailSize || "N/A"}</span>
+                          </div>
+                          {isAlreadyAdded && (
+                            <span className="text-xs text-green-600 font-medium">✓ Already added to shop</span>
+                          )}
                         </div>
                       </div>
+                      {isAlreadyAdded ? (
+                        <span className="text-sm text-green-600 font-medium px-3 py-1.5 bg-green-100 rounded-md">
+                          Added
+                        </span>
+                      ) : (
+                        <Button 
+                          onClick={() => openAddProductDialog(product)}
+                          size="sm"
+                          className="w-full sm:w-auto flex-shrink-0"
+                        >
+                          <Plus className="h-4 w-4 mr-1 sm:mr-2" />
+                          <span className="hidden xs:inline">Add to Shop</span>
+                          <span className="xs:hidden">Add</span>
+                        </Button>
+                      )}
                     </div>
-                    <Button 
-                      onClick={() => openAddProductDialog(product)}
-                      size="sm"
-                      className="w-full sm:w-auto flex-shrink-0"
-                    >
-                      <Plus className="h-4 w-4 mr-1 sm:mr-2" />
-                      <span className="hidden xs:inline">Add to Shop</span>
-                      <span className="xs:hidden">Add</span>
-                    </Button>
-                  </div>
-                ))
+                  );
+                })
               ) : searchQuery === "" ? (
                 <p>Start your search</p>
               ) : (
@@ -645,12 +720,47 @@ const ShopDetail = () => {
       {activeTab === "availableProducts" && (
         <>
           <div className="mb-3 sm:mb-4">
-            <Input
-              placeholder="Search for a product..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full"
-            />
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search for a product..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1"
+              />
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => setShowSearchScanner(!showSearchScanner)}
+                className="flex-shrink-0"
+              >
+                <Camera className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Scanner for search */}
+            {showSearchScanner && (
+              <div className="mt-2 rounded-lg overflow-hidden border">
+                <OptimizedScanner
+                  onScan={(result) => {
+                    setSearchQuery(result);
+                    setShowSearchScanner(false);
+                    toast.success(`Barcode scanned: ${result}`);
+                  }}
+                  onError={(error) => {
+                    console.error("Scanner error:", error);
+                    toast.error("Scanner error. Please try again.");
+                  }}
+                  height={200}
+                />
+                <Button 
+                  variant="ghost" 
+                  className="w-full mt-1"
+                  onClick={() => setShowSearchScanner(false)}
+                >
+                  Close Scanner
+                </Button>
+              </div>
+            )}
           </div>
           
           {productsAtShopLoading && <p>Loading products...</p>}
@@ -698,7 +808,7 @@ const ShopDetail = () => {
             {selectedProduct && (
               <div className="flex items-center space-x-4 mb-4">
                 <img
-                  src={getImageUrl(selectedProduct.img)}
+                  src={addProductImage || getImageUrl(selectedProduct.img)}
                   alt={selectedProduct.title}
                   className="w-16 h-16 object-cover rounded-md"
                   loading="lazy"
@@ -712,6 +822,41 @@ const ShopDetail = () => {
                 </div>
               </div>
             )}
+            
+            {/* Image Upload */}
+            <div className="space-y-2">
+              <label className="block font-semibold">Update Product Image (optional)</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setAddProductImageFile(file);
+                      setAddProductImage(URL.createObjectURL(file));
+                    }
+                  }}
+                  className="flex-1"
+                />
+              </div>
+              {addProductImage && (
+                <div className="flex items-center gap-2 mt-2">
+                  <img src={addProductImage} alt="New image preview" className="w-12 h-12 object-cover rounded-md" />
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      setAddProductImage(null);
+                      setAddProductImageFile(null);
+                    }}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    Remove
+                  </Button>
+                </div>
+              )}
+            </div>
             
             {/* Barcode Scanner for Adding Existing Product */}
             <div className="space-y-2">
@@ -756,10 +901,10 @@ const ShopDetail = () => {
             </div>
             
             <div className="space-y-2">
-              <label className="block font-semibold">AIEL Number</label>
+              <label className="block font-semibold">Aisle Number</label>
               <Input
                 type="text"
-                placeholder="Enter AIEL Number"
+                placeholder="Enter Aisle Number"
                 value={addProductAiel}
                 onChange={(e) => setAddProductAiel(e.target.value)}
               />
@@ -780,20 +925,20 @@ const ShopDetail = () => {
             </div>
             
             <div className="space-y-2">
-              <label className="block font-semibold">caseSize</label>
+              <label className="block font-semibold">Case Size</label>
               <Input
                 type="number"
-                placeholder="Enter RRP"
+                placeholder="Enter Case Size"
                 value={addProductcaseSize}
                 onChange={(e) => setAddProductcaseSize(e.target.value)}
               />
             </div>
             
             <div className="space-y-2">
-              <label className="block font-semibold">packetSize</label>
+              <label className="block font-semibold">Packet Size</label>
               <Input
                 type="number"
-                placeholder="Enter RRP"
+                placeholder="Enter Packet Size"
                 value={addProductpacketSize}
                 onChange={(e) => setAddProductpacketSize(e.target.value)}
               />
