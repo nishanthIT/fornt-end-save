@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar, Tag, Clock, PoundSterling } from "lucide-react";
+import { getImageUrl } from "@/utils/imageUtils";
 
 interface ProductAtShopCardProps {
   productId: string;
@@ -14,7 +15,7 @@ interface ProductAtShopCardProps {
   retailSize: string;
   barcode: string;
   caseBarcode: string | null;
-  img: string[] | null;
+  img: string[] | { url?: string } | null;
   price: number;
   offerPrice?: number;
   offerExpiryDate?: string;
@@ -89,7 +90,6 @@ export const ProductAtShopCard = ({
     offerExpiryDate ? new Date(offerExpiryDate).toISOString().slice(0, 10) : ""
   );
 
-  const fallbackImg = "https://via.placeholder.com/64";
   const currentPrice = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date() ? offerPrice : price;
   const hasActiveOffer = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date();
   const daysRemaining = hasActiveOffer ? getDaysRemaining(offerExpiryDate!) : 0;
@@ -192,7 +192,7 @@ export const ProductAtShopCard = ({
         <div className="flex items-start gap-2">
           {/* Product Image */}
           <img
-            src={img ? (Array.isArray(img) ? img[0] : img) : fallbackImg}
+            src={getImageUrl(img)}
             alt={title}
             className="w-11 h-11 sm:w-14 sm:h-14 object-cover rounded-md flex-shrink-0"
             loading="lazy"

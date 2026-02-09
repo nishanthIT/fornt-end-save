@@ -1,6 +1,15 @@
 // Utility function to construct proper image URLs
-export const getImageUrl = (imagePath: string | string[] | null): string => {
+export const getImageUrl = (imagePath: string | string[] | { url?: string } | null | undefined): string => {
   if (!imagePath) {
+    return "https://www.pngfind.com/pngs/m/131-1312918_png-file-svg-product-icon-transparent-png.png";
+  }
+
+  // Handle object case (e.g., { url: "/uploads/products/xyz.png" })
+  if (typeof imagePath === 'object' && !Array.isArray(imagePath)) {
+    const imgObj = imagePath as { url?: string };
+    if (imgObj.url) {
+      return getImageUrl(imgObj.url);
+    }
     return "https://www.pngfind.com/pngs/m/131-1312918_png-file-svg-product-icon-transparent-png.png";
   }
 
