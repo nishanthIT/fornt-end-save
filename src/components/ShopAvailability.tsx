@@ -25,7 +25,7 @@ export const ShopAvailability = ({ shop }: ShopAvailabilityProps) => {
             <span>{shop.location}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-xl font-semibold">${shop.price}</span>
+            <span className="text-xl font-semibold">£{shop.price}</span>
             <Badge variant={shop.stock > 0 ? "default" : "destructive"}>
               {shop.stock > 0 ? `${shop.stock} in stock` : "Out of stock"}
             </Badge>

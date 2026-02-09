@@ -57,7 +57,7 @@ const EditProductPrice = () => {
           <div className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="price" className="text-sm font-medium">
-                New Price ($)
+                New Price (£)
               </label>
               <Input
                 id="price"

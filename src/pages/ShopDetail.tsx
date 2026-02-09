@@ -259,7 +259,17 @@ const ShopDetail = () => {
 
   // Function to add existing product from search
   const handleAddExistingProduct = async () => {
-    if (!selectedProduct) return;
+    if (!selectedProduct) {
+      toast.error("No product selected");
+      return;
+    }
+    
+    if (!shopId) {
+      toast.error("Shop ID is missing");
+      return;
+    }
+    
+    console.log("Adding product:", { shopId, productId: selectedProduct.id, employeeId });
     
     try {
       setIsSubmitting(true);
@@ -272,15 +282,15 @@ const ShopDetail = () => {
       // If we have an image file, use FormData
       if (addProductImageFile) {
         const formData = new FormData();
-        formData.append('shopId', String(shopId));
-        formData.append('id', String(selectedProduct.id));
-        formData.append('employeeId', String(employeeId));
-        formData.append('casebarcode', addProductCaseBarcode || "");
-        formData.append('price', String(parseFloat(addProductPrice) || 0));
-        formData.append('aiel', addProductAiel || "");
-        formData.append('rrp', String(parseFloat(finalRrp) || 0));
-        formData.append('packetSize', String(packetSize));
-        formData.append('caseSize', String(caseSize));
+        formData.append('shopId', shopId);
+        formData.append('id', selectedProduct.id);
+        if (employeeId) formData.append('employeeId', String(employeeId));
+        if (addProductCaseBarcode) formData.append('casebarcode', addProductCaseBarcode);
+        if (addProductPrice) formData.append('price', String(parseFloat(addProductPrice) || 0));
+        if (addProductAiel) formData.append('aiel', addProductAiel);
+        if (finalRrp) formData.append('rrp', String(parseFloat(finalRrp) || 0));
+        if (addProductpacketSize) formData.append('packetSize', addProductpacketSize);
+        if (addProductcaseSize) formData.append('caseSize', addProductcaseSize);
         formData.append('image', addProductImageFile);
         
         const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addProductAtShopifExistAtProduct`, {
@@ -309,14 +319,16 @@ const ShopDetail = () => {
         const productData = {
           shopId,
           id: selectedProduct.id,
-          employeeId,
-          casebarcode: addProductCaseBarcode || "",
-          price: parseFloat(addProductPrice) || 0,
-          aiel: addProductAiel || "",
-          rrp: parseFloat(finalRrp) || 0,
-          packetSize,
-          caseSize
+          ...(employeeId && { employeeId }),
+          ...(addProductCaseBarcode && { casebarcode: addProductCaseBarcode }),
+          ...(addProductPrice && { price: parseFloat(addProductPrice) || 0 }),
+          ...(addProductAiel && { aiel: addProductAiel }),
+          ...(finalRrp && { rrp: parseFloat(finalRrp) || 0 }),
+          ...(addProductpacketSize && { packetSize: addProductpacketSize }),
+          ...(addProductcaseSize && { caseSize: addProductcaseSize })
         };
+        
+        console.log("Sending product data:", productData);
 
         const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addProductAtShopifExistAtProduct`, {
           method: "POST",
