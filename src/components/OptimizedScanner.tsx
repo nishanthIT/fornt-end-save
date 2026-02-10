@@ -1,5 +1,5 @@
-import { Html5Qrcode } from "html5-qrcode";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useZxing } from "react-zxing";
+import { useState, useRef, useCallback } from "react";
 
 interface OptimizedScannerProps {
   onScan: (result: string) => void;
@@ -10,8 +10,9 @@ interface OptimizedScannerProps {
 }
 
 /**
- * OptimizedScanner - Reliable barcode scanner using html5-qrcode
- * Works reliably on both iOS and Android
+ * OptimizedScanner - Full-width barcode scanner using ZXing
+ * No focus box - uses entire camera view for scanning
+ * Works reliably on Android
  */
 export const OptimizedScanner = ({
   onScan,
@@ -22,99 +23,45 @@ export const OptimizedScanner = ({
 }: OptimizedScannerProps) => {
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [isStarting, setIsStarting] = useState(true);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const lastScannedRef = useRef<string>("");
-  const scannerIdRef = useRef(`scanner-${Math.random().toString(36).substr(2, 9)}`);
+  const lastScanTimeRef = useRef<number>(0);
 
-  const stopScanner = useCallback(async () => {
-    if (scannerRef.current) {
-      try {
-        const state = scannerRef.current.getState();
-        if (state === 2) { // SCANNING
-          await scannerRef.current.stop();
-        }
-        scannerRef.current.clear();
-      } catch (e) {
-        console.warn("Error stopping scanner:", e);
+  const { ref } = useZxing({
+    onResult(result) {
+      const code = result.getText();
+      const now = Date.now();
+      
+      // Debounce: prevent duplicate scans within 1.5 seconds
+      if (code && (code !== lastScannedRef.current || now - lastScanTimeRef.current > 1500)) {
+        lastScannedRef.current = code;
+        lastScanTimeRef.current = now;
+        onScan(code);
       }
-      scannerRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const startScanner = async () => {
-      if (paused) return;
-
-      try {
-        // Wait for DOM element to be ready
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        if (!mounted) return;
-
-        // Clean up any existing scanner
-        await stopScanner();
-
-        if (!mounted) return;
-
-        const scanner = new Html5Qrcode(scannerIdRef.current);
-        scannerRef.current = scanner;
-
-        const config = {
-          fps: 10,
-          qrbox: { width: 250, height: 150 },
-          aspectRatio: 1.777,
-          formatsToSupport: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], // All formats
-        };
-
-        await scanner.start(
-          { facingMode: "environment" },
-          config,
-          (decodedText) => {
-            if (decodedText && decodedText !== lastScannedRef.current) {
-              lastScannedRef.current = decodedText;
-              onScan(decodedText);
-              // Reset after 2 seconds
-              setTimeout(() => {
-                lastScannedRef.current = "";
-              }, 2000);
-            }
-          },
-          () => {} // Ignore QR code not found errors
-        );
-
-        if (mounted) {
-          setIsStarting(false);
-          setHasError(false);
-        }
-      } catch (err) {
-        console.error("Scanner start error:", err);
-        if (mounted) {
-          setIsStarting(false);
-          setHasError(true);
-          setErrorMessage(err instanceof Error ? err.message : "Failed to start camera");
-          onError?.(err instanceof Error ? err : new Error(String(err)));
-        }
+    },
+    onError(error) {
+      // Only show error if it's a real camera error, not "No barcode found"
+      if (error.message && !error.message.includes("No MultiFormat Readers")) {
+        console.error("Scanner error:", error);
+        setHasError(true);
+        setErrorMessage(error.message);
+        onError?.(error);
       }
-    };
-
-    startScanner();
-
-    return () => {
-      mounted = false;
-      stopScanner();
-    };
-  }, [paused, onScan, onError, stopScanner]);
+    },
+    paused,
+    constraints: {
+      video: {
+        facingMode: "environment",
+        width: { ideal: 1920, min: 1280 },
+        height: { ideal: 1080, min: 720 },
+      },
+    },
+    timeBetweenDecodingAttempts: 150,
+  });
 
   const handleRetry = useCallback(() => {
     setHasError(false);
     setErrorMessage("");
-    setIsStarting(true);
-    // Force re-render by updating key
-    scannerIdRef.current = `scanner-${Math.random().toString(36).substr(2, 9)}`;
+    window.location.reload();
   }, []);
 
   if (hasError) {
@@ -135,19 +82,28 @@ export const OptimizedScanner = ({
 
   return (
     <div 
-      ref={containerRef}
       style={{ width, height, position: 'relative' }} 
       className="overflow-hidden rounded-md bg-black"
     >
-      <div 
-        id={scannerIdRef.current}
-        style={{ width: '100%', height: '100%' }}
+      <video 
+        ref={ref}
+        style={{ 
+          width: '100%', 
+          height: '100%', 
+          objectFit: 'cover',
+        }}
+        playsInline
+        muted
       />
-      {isStarting && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75">
-          <p className="text-white text-sm">Starting camera...</p>
+      {/* Scan guide overlay */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-4 border-2 border-white/30 rounded-lg" />
+        <div className="absolute bottom-2 left-0 right-0 text-center">
+          <span className="text-white/70 text-xs bg-black/50 px-2 py-1 rounded">
+            Point camera at barcode
+          </span>
         </div>
-      )}
+      </div>
     </div>
   );
 };
