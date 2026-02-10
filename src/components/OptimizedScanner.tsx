@@ -101,10 +101,13 @@ export const OptimizedScanner = ({
         onScan={handleScan}
         onError={handleError}
         paused={paused}
-        scanDelay={isAndroid ? 500 : 300}
+        scanDelay={isAndroid ? 400 : 200}
         constraints={{
           facingMode: "environment",
-          // Don't specify resolution - let device pick optimal
+          // Manual focus - no autofocus hunting = faster scanning
+          // @ts-expect-error - focusMode/focusDistance valid but not in all TS types
+          focusMode: "manual",
+          focusDistance: 0.3,  // Fixed at ~30cm
         }}
         components={{
           torch: false,
