@@ -1,5 +1,5 @@
-import { Scanner } from "@yudiel/react-qr-scanner";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { Html5Qrcode } from "html5-qrcode";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 interface OptimizedScannerProps {
   onScan: (result: string) => void;
@@ -9,15 +9,9 @@ interface OptimizedScannerProps {
   paused?: boolean;
 }
 
-// Detect if the device is Android
-const isAndroid = () => {
-  return /android/i.test(navigator.userAgent);
-};
-
 /**
- * OptimizedScanner - A barcode/QR scanner with better autofocus performance
- * Uses @yudiel/react-qr-scanner which has better camera handling
- * Optimized for iPhone and Samsung devices with focus constraints
+ * OptimizedScanner - Reliable barcode scanner using html5-qrcode
+ * Works reliably on both iOS and Android
  */
 export const OptimizedScanner = ({
   onScan,
@@ -26,123 +20,111 @@ export const OptimizedScanner = ({
   height = 250,
   paused = false,
 }: OptimizedScannerProps) => {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [scannerKey, setScannerKey] = useState(0); // Key to force re-mount scanner
-  const [isReady, setIsReady] = useState(false);
-  const mountedRef = useRef(true);
-  const retryCountRef = useRef(0);
-  const maxRetries = 3;
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [isStarting, setIsStarting] = useState(true);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lastScannedRef = useRef<string>("");
+  const scannerIdRef = useRef(`scanner-${Math.random().toString(36).substr(2, 9)}`);
+
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        const state = scannerRef.current.getState();
+        if (state === 2) { // SCANNING
+          await scannerRef.current.stop();
+        }
+        scannerRef.current.clear();
+      } catch (e) {
+        console.warn("Error stopping scanner:", e);
+      }
+      scannerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
-    mountedRef.current = true;
-    
-    // Simplified camera init - just set ready and let Scanner handle permissions
-    const initCamera = async () => {
+    let mounted = true;
+
+    const startScanner = async () => {
+      if (paused) return;
+
       try {
-        // On Android, brief delay to let any previous camera release
-        if (isAndroid()) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
+        // Wait for DOM element to be ready
+        await new Promise(resolve => setTimeout(resolve, 100));
         
-        // Try to get camera permission directly - more reliable on Android
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: "environment" } 
-          });
-          // Got permission, release stream and let Scanner use camera
-          stream.getTracks().forEach(track => track.stop());
-          
-          if (!mountedRef.current) return;
-          
-          setHasPermission(true);
-          setCameraError(null);
-          // Small delay for Android camera to fully release
-          setTimeout(() => {
-            if (mountedRef.current) {
-              setIsReady(true);
+        if (!mounted) return;
+
+        // Clean up any existing scanner
+        await stopScanner();
+
+        if (!mounted) return;
+
+        const scanner = new Html5Qrcode(scannerIdRef.current);
+        scannerRef.current = scanner;
+
+        const config = {
+          fps: 10,
+          qrbox: { width: 250, height: 150 },
+          aspectRatio: 1.777,
+          formatsToSupport: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], // All formats
+        };
+
+        await scanner.start(
+          { facingMode: "environment" },
+          config,
+          (decodedText) => {
+            if (decodedText && decodedText !== lastScannedRef.current) {
+              lastScannedRef.current = decodedText;
+              onScan(decodedText);
+              // Reset after 2 seconds
+              setTimeout(() => {
+                lastScannedRef.current = "";
+              }, 2000);
             }
-          }, isAndroid() ? 300 : 50);
-        } catch (error) {
-          if (!mountedRef.current) return;
-          handleCameraError(error);
+          },
+          () => {} // Ignore QR code not found errors
+        );
+
+        if (mounted) {
+          setIsStarting(false);
+          setHasError(false);
         }
-      } catch (error) {
-        if (!mountedRef.current) return;
-        handleCameraError(error);
+      } catch (err) {
+        console.error("Scanner start error:", err);
+        if (mounted) {
+          setIsStarting(false);
+          setHasError(true);
+          setErrorMessage(err instanceof Error ? err.message : "Failed to start camera");
+          onError?.(err instanceof Error ? err : new Error(String(err)));
+        }
       }
     };
-    
-    initCamera();
-    
-    // Cleanup on unmount
+
+    startScanner();
+
     return () => {
-      mountedRef.current = false;
-      setIsReady(false);
+      mounted = false;
+      stopScanner();
     };
+  }, [paused, onScan, onError, stopScanner]);
+
+  const handleRetry = useCallback(() => {
+    setHasError(false);
+    setErrorMessage("");
+    setIsStarting(true);
+    // Force re-render by updating key
+    scannerIdRef.current = `scanner-${Math.random().toString(36).substr(2, 9)}`;
   }, []);
 
-  const handleCameraError = (error: unknown) => {
-    console.error("Camera error:", error);
-    setHasPermission(false);
-    if (error instanceof Error) {
-      setCameraError(error.message);
-    } else {
-      setCameraError("Failed to access camera");
-    }
-  };
-
-  // Retry mechanism for Android camera issues
-  const handleScannerError = useCallback((error: unknown) => {
-    console.error("Scanner error:", error);
-    
-    if (retryCountRef.current < maxRetries) {
-      retryCountRef.current++;
-      console.log(`Retrying camera... attempt ${retryCountRef.current}/${maxRetries}`);
-      
-      // Reset and retry quickly
-      setIsReady(false);
-      setTimeout(() => {
-        if (mountedRef.current) {
-          setScannerKey(prev => prev + 1); // Force re-mount
-          setIsReady(true);
-        }
-      }, 300);
-    } else {
-      onError?.(error instanceof Error ? error : new Error(String(error)));
-    }
-  }, [onError]);
-
-  // Get constraints based on device type - Android needs simpler constraints
-  const getConstraints = useCallback((): MediaTrackConstraints => {
-    if (isAndroid()) {
-      // Simple constraints for Android - just request back camera
-      return {
-        facingMode: "environment",
-      };
-    }
-    
-    // iOS and other devices can use more advanced constraints
-    return {
-      facingMode: "environment",
-      width: { ideal: 1280, min: 640 },
-      height: { ideal: 720, min: 480 },
-      // Request continuous autofocus for faster focusing (iOS supported)
-      advanced: [
-        { focusMode: "continuous" } as MediaTrackConstraintSet,
-      ],
-    };
-  }, []);
-
-  if (hasPermission === false) {
+  if (hasError) {
     return (
       <div className="flex flex-col items-center justify-center bg-gray-100 rounded-md p-4" style={{ width, height }}>
         <p className="text-sm text-gray-500 text-center">
-          Camera permission denied. Please allow camera access to scan barcodes.
-          {cameraError && <span className="block mt-1 text-xs text-red-500">{cameraError}</span>}
+          Camera error: {errorMessage}
         </p>
         <button 
-          onClick={() => window.location.reload()} 
+          onClick={handleRetry}
           className="mt-3 px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
         >
           Retry
@@ -151,50 +133,21 @@ export const OptimizedScanner = ({
     );
   }
 
-  // Show loading state while camera is initializing
-  if (!isReady || hasPermission === null) {
-    return (
-      <div className="flex items-center justify-center bg-gray-100 rounded-md p-4" style={{ width, height }}>
-        <p className="text-sm text-gray-500 text-center">
-          Initializing camera...
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ width, height }} className="overflow-hidden rounded-md">
-      <Scanner
-        key={scannerKey}
-        onScan={(result) => {
-          if (result && result.length > 0 && result[0].rawValue) {
-            retryCountRef.current = 0; // Reset retry count on successful scan
-            onScan(result[0].rawValue);
-          }
-        }}
-        onError={handleScannerError}
-        paused={paused}
-        scanDelay={100} // Fast scan rate for quick detection
-        constraints={getConstraints()}
-        styles={{
-          container: {
-            width: "100%",
-            height: "100%",
-          },
-          video: {
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          },
-        }}
-        formats={[
-          "ean_13",
-          "ean_8",
-          "upc_a",
-          "upc_e",
-          "code_128",
-        ]}
+    <div 
+      ref={containerRef}
+      style={{ width, height, position: 'relative' }} 
+      className="overflow-hidden rounded-md bg-black"
+    >
+      <div 
+        id={scannerIdRef.current}
+        style={{ width: '100%', height: '100%' }}
       />
+      {isStarting && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75">
+          <p className="text-white text-sm">Starting camera...</p>
+        </div>
+      )}
     </div>
   );
 };
