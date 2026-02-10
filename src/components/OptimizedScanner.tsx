@@ -34,108 +34,42 @@ export const OptimizedScanner = ({
   const retryCountRef = useRef(0);
   const maxRetries = 3;
 
-  // Release any existing camera streams before starting
-  const releaseAllCameras = useCallback(async () => {
-    try {
-      // Get all media devices and stop any active video tracks
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(d => d.kind === 'videoinput');
-      
-      // Try to get and immediately release each camera to clear any locks
-      for (const device of videoDevices) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: device.deviceId }
-          });
-          stream.getTracks().forEach(track => {
-            track.stop();
-          });
-        } catch {
-          // Ignore errors for individual devices
-        }
-      }
-    } catch (error) {
-      console.warn("Could not release cameras:", error);
-    }
-  }, []);
-
   useEffect(() => {
     mountedRef.current = true;
     
-    // Check camera permission on mount - don't hold the stream
+    // Simplified camera init - just set ready and let Scanner handle permissions
     const initCamera = async () => {
       try {
-        // On Android, first try to release any locked cameras
+        // On Android, brief delay to let any previous camera release
         if (isAndroid()) {
-          await releaseAllCameras();
-          // Small delay after releasing to let the camera fully reset
           await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        // Just check permission status without holding the stream
-        const permissionStatus = await navigator.permissions.query({ 
-          name: 'camera' as PermissionName 
-        });
-        
-        if (!mountedRef.current) return;
-        
-        if (permissionStatus.state === 'granted') {
-          setHasPermission(true);
-          setCameraError(null);
-          // Quick start for camera
-          setTimeout(() => {
-            if (mountedRef.current) {
-              setIsReady(true);
-            }
-          }, isAndroid() ? 200 : 50);
-        } else if (permissionStatus.state === 'prompt') {
-          // Request permission by briefly accessing the camera
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-              video: { facingMode: "environment" } 
-            });
-            stream.getTracks().forEach(track => track.stop());
-            
-            if (!mountedRef.current) return;
-            
-            setHasPermission(true);
-            setCameraError(null);
-            setTimeout(() => {
-              if (mountedRef.current) {
-                setIsReady(true);
-              }
-            }, isAndroid() ? 200 : 50);
-          } catch (error) {
-            if (!mountedRef.current) return;
-            handleCameraError(error);
-          }
-        } else {
-          setHasPermission(false);
-          setCameraError("Camera permission denied");
-        }
-      } catch (error) {
-        // Fallback for browsers that don't support permissions.query for camera
-        if (!mountedRef.current) return;
-        
+        // Try to get camera permission directly - more reliable on Android
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { facingMode: "environment" } 
           });
+          // Got permission, release stream and let Scanner use camera
           stream.getTracks().forEach(track => track.stop());
           
           if (!mountedRef.current) return;
           
           setHasPermission(true);
           setCameraError(null);
+          // Small delay for Android camera to fully release
           setTimeout(() => {
             if (mountedRef.current) {
               setIsReady(true);
             }
-          }, isAndroid() ? 200 : 50);
-        } catch (fallbackError) {
+          }, isAndroid() ? 300 : 50);
+        } catch (error) {
           if (!mountedRef.current) return;
-          handleCameraError(fallbackError);
+          handleCameraError(error);
         }
+      } catch (error) {
+        if (!mountedRef.current) return;
+        handleCameraError(error);
       }
     };
     
@@ -146,7 +80,7 @@ export const OptimizedScanner = ({
       mountedRef.current = false;
       setIsReady(false);
     };
-  }, [releaseAllCameras]);
+  }, []);
 
   const handleCameraError = (error: unknown) => {
     console.error("Camera error:", error);
@@ -162,36 +96,29 @@ export const OptimizedScanner = ({
   const handleScannerError = useCallback((error: unknown) => {
     console.error("Scanner error:", error);
     
-    if (isAndroid() && retryCountRef.current < maxRetries) {
+    if (retryCountRef.current < maxRetries) {
       retryCountRef.current++;
       console.log(`Retrying camera... attempt ${retryCountRef.current}/${maxRetries}`);
       
-      // Reset and retry
+      // Reset and retry quickly
       setIsReady(false);
-      setTimeout(async () => {
-        if (!mountedRef.current) return;
-        
-        await releaseAllCameras();
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
+      setTimeout(() => {
         if (mountedRef.current) {
           setScannerKey(prev => prev + 1); // Force re-mount
           setIsReady(true);
         }
-      }, 500);
+      }, 300);
     } else {
       onError?.(error instanceof Error ? error : new Error(String(error)));
     }
-  }, [onError, releaseAllCameras]);
+  }, [onError]);
 
   // Get constraints based on device type - Android needs simpler constraints
   const getConstraints = useCallback((): MediaTrackConstraints => {
     if (isAndroid()) {
-      // Simplified constraints for Android - prioritize back camera
+      // Simple constraints for Android - just request back camera
       return {
-        facingMode: { ideal: "environment" },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+        facingMode: "environment",
       };
     }
     
