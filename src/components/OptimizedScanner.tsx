@@ -1,5 +1,5 @@
-import { useZxing } from "react-zxing";
-import { useState, useRef, useCallback } from "react";
+import { Scanner } from "@yudiel/react-qr-scanner";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 interface OptimizedScannerProps {
   onScan: (result: string) => void;
@@ -9,10 +9,13 @@ interface OptimizedScannerProps {
   paused?: boolean;
 }
 
+// Check if device is Android
+const isAndroid = /android/i.test(navigator.userAgent);
+
 /**
- * OptimizedScanner - Full-width barcode scanner using ZXing
- * No focus box - uses entire camera view for scanning
- * Works reliably on Android
+ * OptimizedScanner - Full camera view barcode scanner
+ * NO focus box - scans entire camera view
+ * Optimized for Android
  */
 export const OptimizedScanner = ({
   onScan,
@@ -23,46 +26,45 @@ export const OptimizedScanner = ({
 }: OptimizedScannerProps) => {
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [isReady, setIsReady] = useState(false);
   const lastScannedRef = useRef<string>("");
   const lastScanTimeRef = useRef<number>(0);
 
-  const { ref } = useZxing({
-    onResult(result) {
-      const code = result.getText();
+  // Add delay for Android to let camera initialize
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, isAndroid ? 500 : 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleScan = useCallback((result: { rawValue: string }[]) => {
+    if (result && result.length > 0 && result[0].rawValue) {
+      const code = result[0].rawValue;
       const now = Date.now();
       
       // Debounce: prevent duplicate scans within 1.5 seconds
       if (code && (code !== lastScannedRef.current || now - lastScanTimeRef.current > 1500)) {
         lastScannedRef.current = code;
         lastScanTimeRef.current = now;
+        console.log("Barcode scanned:", code);
         onScan(code);
       }
-    },
-    onError(error) {
-      // Only show error if it's a real camera error, not "No barcode found"
-      if (error.message && !error.message.includes("No MultiFormat Readers")) {
-        console.error("Scanner error:", error);
-        setHasError(true);
-        setErrorMessage(error.message);
-        onError?.(error);
-      }
-    },
-    paused,
-    constraints: {
-      video: {
-        facingMode: "environment",
-        width: { ideal: 1920, min: 1280 },
-        height: { ideal: 1080, min: 720 },
-      },
-    },
-    timeBetweenDecodingAttempts: 150,
-  });
+    }
+  }, [onScan]);
 
-  const handleRetry = useCallback(() => {
-    setHasError(false);
-    setErrorMessage("");
-    window.location.reload();
-  }, []);
+  const handleError = useCallback((error: unknown) => {
+    // Ignore "not found" errors - these happen when no barcode is in view
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    if (errorMsg.includes("NotFoundException") || errorMsg.includes("No barcode")) {
+      return; // Normal - just means no barcode detected yet
+    }
+    
+    console.error("Scanner error:", error);
+    setHasError(true);
+    setErrorMessage(errorMsg);
+    onError?.(error instanceof Error ? error : new Error(errorMsg));
+  }, [onError]);
 
   if (hasError) {
     return (
@@ -71,7 +73,12 @@ export const OptimizedScanner = ({
           Camera error: {errorMessage}
         </p>
         <button 
-          onClick={handleRetry}
+          onClick={() => {
+            setHasError(false);
+            setErrorMessage("");
+            setIsReady(false);
+            setTimeout(() => setIsReady(true), 500);
+          }}
           className="mt-3 px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
         >
           Retry
@@ -80,30 +87,49 @@ export const OptimizedScanner = ({
     );
   }
 
-  return (
-    <div 
-      style={{ width, height, position: 'relative' }} 
-      className="overflow-hidden rounded-md bg-black"
-    >
-      <video 
-        ref={ref}
-        style={{ 
-          width: '100%', 
-          height: '100%', 
-          objectFit: 'cover',
-        }}
-        playsInline
-        muted
-      />
-      {/* Scan guide overlay */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-4 border-2 border-white/30 rounded-lg" />
-        <div className="absolute bottom-2 left-0 right-0 text-center">
-          <span className="text-white/70 text-xs bg-black/50 px-2 py-1 rounded">
-            Point camera at barcode
-          </span>
-        </div>
+  if (!isReady) {
+    return (
+      <div className="flex items-center justify-center bg-gray-800 rounded-md" style={{ width, height }}>
+        <p className="text-white text-sm">Starting camera...</p>
       </div>
+    );
+  }
+
+  return (
+    <div style={{ width, height }} className="overflow-hidden rounded-md bg-black">
+      <Scanner
+        onScan={handleScan}
+        onError={handleError}
+        paused={paused}
+        scanDelay={isAndroid ? 500 : 300}
+        constraints={{
+          facingMode: "environment",
+          // Don't specify resolution - let device pick optimal
+        }}
+        components={{
+          torch: false,
+          finder: false,  // NO FOCUS BOX
+        }}
+        styles={{
+          container: {
+            width: "100%",
+            height: "100%",
+            padding: 0,
+          },
+          video: {
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          },
+        }}
+        formats={[
+          "ean_13",
+          "ean_8",
+          "upc_a",
+          "upc_e",
+          "code_128",
+        ]}
+      />
     </div>
   );
 };
