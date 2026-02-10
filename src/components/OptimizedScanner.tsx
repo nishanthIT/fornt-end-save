@@ -69,7 +69,7 @@ export const OptimizedScanner = ({
         if (isAndroid()) {
           await releaseAllCameras();
           // Small delay after releasing to let the camera fully reset
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
         
         // Just check permission status without holding the stream
@@ -82,12 +82,12 @@ export const OptimizedScanner = ({
         if (permissionStatus.state === 'granted') {
           setHasPermission(true);
           setCameraError(null);
-          // Delay to ensure camera is fully available
+          // Quick start for camera
           setTimeout(() => {
             if (mountedRef.current) {
               setIsReady(true);
             }
-          }, isAndroid() ? 500 : 100);
+          }, isAndroid() ? 200 : 50);
         } else if (permissionStatus.state === 'prompt') {
           // Request permission by briefly accessing the camera
           try {
@@ -104,7 +104,7 @@ export const OptimizedScanner = ({
               if (mountedRef.current) {
                 setIsReady(true);
               }
-            }, isAndroid() ? 500 : 100);
+            }, isAndroid() ? 200 : 50);
           } catch (error) {
             if (!mountedRef.current) return;
             handleCameraError(error);
@@ -131,7 +131,7 @@ export const OptimizedScanner = ({
             if (mountedRef.current) {
               setIsReady(true);
             }
-          }, isAndroid() ? 500 : 100);
+          }, isAndroid() ? 200 : 50);
         } catch (fallbackError) {
           if (!mountedRef.current) return;
           handleCameraError(fallbackError);
@@ -172,13 +172,13 @@ export const OptimizedScanner = ({
         if (!mountedRef.current) return;
         
         await releaseAllCameras();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 200));
         
         if (mountedRef.current) {
           setScannerKey(prev => prev + 1); // Force re-mount
           setIsReady(true);
         }
-      }, 1000);
+      }, 500);
     } else {
       onError?.(error instanceof Error ? error : new Error(String(error)));
     }
@@ -187,9 +187,11 @@ export const OptimizedScanner = ({
   // Get constraints based on device type - Android needs simpler constraints
   const getConstraints = useCallback((): MediaTrackConstraints => {
     if (isAndroid()) {
-      // Very simplified constraints for Android - maximum compatibility
+      // Simplified constraints for Android - prioritize back camera
       return {
-        facingMode: "environment",
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
       };
     }
     
@@ -245,7 +247,7 @@ export const OptimizedScanner = ({
         }}
         onError={handleScannerError}
         paused={paused}
-        scanDelay={isAndroid() ? 500 : 300} // Slower scan rate on Android for stability
+        scanDelay={100} // Fast scan rate for quick detection
         constraints={getConstraints()}
         styles={{
           container: {
@@ -261,14 +263,9 @@ export const OptimizedScanner = ({
         formats={[
           "ean_13",
           "ean_8",
-          "code_128",
-          "code_39",
-          "code_93",
           "upc_a",
           "upc_e",
-          "itf",
-          "qr_code",
-          "data_matrix",
+          "code_128",
         ]}
       />
     </div>
