@@ -29,12 +29,21 @@ export const OptimizedScanner = ({
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [isReady, setIsReady] = useState(false);
   const [scanLinePosition, setScanLinePosition] = useState(0);
+  const [retryCount, setRetryCount] = useState(0); // Track retries to force re-init
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const containerIdRef = useRef(`scanner-${Date.now()}`);
+  const containerIdRef = useRef(`scanner-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const lastScannedRef = useRef<string>("");
   const lastScanTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number | null>(null);
   const scanLineDirectionRef = useRef(1); // 1 = down, -1 = up
+  const timeoutsRef = useRef<NodeJS.Timeout[]>([]); // Track all timeouts for cleanup
+  const isScanningRef = useRef(false); // Prevent race conditions
+
+  // Clear all tracked timeouts
+  const clearAllTimeouts = useCallback(() => {
+    timeoutsRef.current.forEach(t => clearTimeout(t));
+    timeoutsRef.current = [];
+  }, []);
 
   // Animate the red scan line
   useEffect(() => {
@@ -75,9 +84,8 @@ export const OptimizedScanner = ({
 
   const handleScanSuccess = useCallback((decodedText: string) => {
     const now = Date.now();
-    // Debounce: prevent duplicate scans of SAME barcode within 800ms
-    // But allow different barcodes immediately
-    if (decodedText && (decodedText !== lastScannedRef.current || now - lastScanTimeRef.current > 800)) {
+    // Allow same barcode after 500ms, different barcodes immediately
+    if (decodedText && (decodedText !== lastScannedRef.current || now - lastScanTimeRef.current > 500)) {
       lastScannedRef.current = decodedText;
       lastScanTimeRef.current = now;
       console.log("Barcode scanned:", decodedText);
@@ -85,47 +93,55 @@ export const OptimizedScanner = ({
     }
   }, [onScan]);
 
+  // Stop scanner safely
+  const stopScanner = useCallback(async () => {
+    clearAllTimeouts();
+    
+    if (scannerRef.current && isScanningRef.current) {
+      try {
+        isScanningRef.current = false;
+        await scannerRef.current.stop();
+        console.log("Scanner stopped successfully");
+      } catch (err) {
+        console.log("Scanner stop error (may already be stopped):", err);
+      }
+    }
+    scannerRef.current = null;
+  }, [clearAllTimeouts]);
+
   useEffect(() => {
-    if (paused) return;
+    if (paused) {
+      stopScanner();
+      return;
+    }
     
     let mounted = true;
     const containerId = containerIdRef.current;
 
     const startScanner = async () => {
+      // Ensure previous scanner is stopped
+      await stopScanner();
+      
+      if (!mounted) return;
+      
       try {
         // Create scanner instance
         const html5Qrcode = new Html5Qrcode(containerId, {
           verbose: false,
           experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true // Use native BarcodeDetector API if available
+            useBarCodeDetectorIfSupported: true
           }
         });
         scannerRef.current = html5Qrcode;
 
-        // Aggressive scanning config - high FPS, full view scanning
+        // Scanning config
         const config = {
-          fps: isIOS ? 15 : 30, // Higher FPS for faster scanning
-          qrbox: undefined, // No scan box - scan full view for speed
+          fps: isIOS ? 10 : 20, // Moderate FPS to avoid overload
+          qrbox: undefined,
           aspectRatio: isIOS ? 4 / 3 : 16 / 9,
           disableFlip: false,
           formatsToSupport: [
-            0, // QR_CODE
-            1, // AZTEC
-            2, // CODABAR
-            3, // CODE_39
-            4, // CODE_93
-            5, // CODE_128
-            6, // DATA_MATRIX
-            7, // MAXICODE
-            8, // ITF
-            9, // EAN_13
-            10, // EAN_8
-            11, // PDF_417
-            12, // RSS_14
-            13, // RSS_EXPANDED
-            14, // UPC_A
-            15, // UPC_E
-            16, // UPC_EAN_EXTENSION
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
           ],
           videoConstraints: isIOS ? {
             facingMode: { exact: "environment" },
@@ -133,8 +149,8 @@ export const OptimizedScanner = ({
             height: { min: 480, ideal: 720, max: 1080 },
           } : {
             facingMode: "environment",
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
           } as MediaTrackConstraints,
         };
 
@@ -142,57 +158,58 @@ export const OptimizedScanner = ({
           { facingMode: "environment" },
           config,
           handleScanSuccess,
-          () => {} // Ignore scan failures (no barcode in view) - keep scanning
+          () => {} // Ignore failures - keep scanning
         );
 
-        // Apply focus settings for better barcode detection
+        isScanningRef.current = true;
+
+        // Apply focus settings
         const applyFocusSettings = async () => {
+          if (!mounted || !isScanningRef.current) return;
+          
           try {
             const videoElement = document.querySelector(`#${containerId} video`) as HTMLVideoElement;
             if (videoElement?.srcObject) {
               const stream = videoElement.srcObject as MediaStream;
               const track = stream.getVideoTracks()[0];
+              if (!track) return;
+              
               const capabilities = track.getCapabilities?.();
               
               // @ts-expect-error - focusMode is valid
               if (capabilities?.focusMode) {
                 const constraints: MediaTrackConstraints = {};
                 
-                // @ts-expect-error - focusMode is valid
+                // @ts-expect-error
                 if (capabilities.focusMode.includes("continuous")) {
                   // @ts-expect-error
                   constraints.focusMode = "continuous";
                 }
                 
-                // @ts-expect-error
-                if (isAndroid && capabilities.focusDistance) {
-                  // @ts-expect-error
-                  constraints.focusDistance = 0.3;
-                }
-                
                 if (Object.keys(constraints).length > 0) {
                   await track.applyConstraints(constraints);
-                  console.log("Applied focus constraints:", constraints);
+                  console.log("Applied focus constraints");
                 }
               }
             }
           } catch (focusErr) {
-            console.log("Focus constraints not supported, using defaults");
+            // Ignore focus errors - not critical
           }
         };
 
-        // Apply focus settings - iOS needs multiple attempts
+        // Apply focus with tracked timeouts
+        const t1 = setTimeout(applyFocusSettings, 500);
+        timeoutsRef.current.push(t1);
+        
         if (isIOS) {
-          setTimeout(applyFocusSettings, 300);
-          setTimeout(applyFocusSettings, 1000);
-          setTimeout(applyFocusSettings, 2000);
-        } else {
-          setTimeout(applyFocusSettings, 100);
+          const t2 = setTimeout(applyFocusSettings, 1500);
+          timeoutsRef.current.push(t2);
         }
 
         if (mounted) setIsReady(true);
       } catch (err) {
         console.error("Scanner error:", err);
+        isScanningRef.current = false;
         if (mounted) {
           setHasError(true);
           setErrorMessage(err instanceof Error ? err.message : String(err));
@@ -201,19 +218,32 @@ export const OptimizedScanner = ({
       }
     };
 
-    // Short delay for camera initialization
-    const delay = isIOS ? 200 : 100;
+    // Delay start
+    const delay = isIOS ? 300 : 150;
     const timer = setTimeout(startScanner, delay);
+    timeoutsRef.current.push(timer);
 
     return () => {
       mounted = false;
-      clearTimeout(timer);
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
-        scannerRef.current = null;
-      }
+      clearAllTimeouts();
+      stopScanner();
     };
-  }, [paused, handleScanSuccess, onError]);
+  }, [paused, handleScanSuccess, onError, stopScanner, clearAllTimeouts, retryCount]);
+
+  // Handle retry - reset everything
+  const handleRetry = useCallback(() => {
+    // Reset all scan state
+    lastScannedRef.current = "";
+    lastScanTimeRef.current = 0;
+    
+    // Generate new container ID to force fresh DOM element
+    containerIdRef.current = `scanner-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    setHasError(false);
+    setErrorMessage("");
+    setIsReady(false);
+    setRetryCount(prev => prev + 1); // Force useEffect to re-run
+  }, []);
 
   if (hasError) {
     return (
@@ -222,11 +252,7 @@ export const OptimizedScanner = ({
           Camera error: {errorMessage}
         </p>
         <button 
-          onClick={() => {
-            setHasError(false);
-            setErrorMessage("");
-            setIsReady(false);
-          }}
+          onClick={handleRetry}
           className="mt-3 px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
         >
           Retry
@@ -263,13 +289,9 @@ export const OptimizedScanner = ({
       {/* Corner brackets for scan area */}
       {isReady && (
         <>
-          {/* Top-left corner */}
           <div style={{ position: 'absolute', top: 10, left: 10, width: 30, height: 30, borderTop: '3px solid #ff0000', borderLeft: '3px solid #ff0000', zIndex: 10 }} />
-          {/* Top-right corner */}
           <div style={{ position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderTop: '3px solid #ff0000', borderRight: '3px solid #ff0000', zIndex: 10 }} />
-          {/* Bottom-left corner */}
           <div style={{ position: 'absolute', bottom: 10, left: 10, width: 30, height: 30, borderBottom: '3px solid #ff0000', borderLeft: '3px solid #ff0000', zIndex: 10 }} />
-          {/* Bottom-right corner */}
           <div style={{ position: 'absolute', bottom: 10, right: 10, width: 30, height: 30, borderBottom: '3px solid #ff0000', borderRight: '3px solid #ff0000', zIndex: 10 }} />
         </>
       )}
