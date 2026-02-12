@@ -16,6 +16,7 @@ const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 /**
  * OptimizedScanner - Fast barcode scanner using html5-qrcode
  * Optimized for both Android and iOS with proper focus handling
+ * Features: Red scan line animation, continuous aggressive scanning
  */
 export const OptimizedScanner = ({
   onScan,
@@ -27,15 +28,56 @@ export const OptimizedScanner = ({
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [isReady, setIsReady] = useState(false);
+  const [scanLinePosition, setScanLinePosition] = useState(0);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerIdRef = useRef(`scanner-${Date.now()}`);
   const lastScannedRef = useRef<string>("");
   const lastScanTimeRef = useRef<number>(0);
+  const animationFrameRef = useRef<number | null>(null);
+  const scanLineDirectionRef = useRef(1); // 1 = down, -1 = up
+
+  // Animate the red scan line
+  useEffect(() => {
+    if (!isReady || paused) return;
+    
+    let lastTime = 0;
+    const speed = 2; // pixels per frame
+    
+    const animate = (timestamp: number) => {
+      if (timestamp - lastTime >= 16) { // ~60fps
+        setScanLinePosition(prev => {
+          const containerHeight = typeof height === 'number' ? height : 250;
+          let newPos = prev + (speed * scanLineDirectionRef.current);
+          
+          if (newPos >= containerHeight - 4) {
+            scanLineDirectionRef.current = -1;
+            newPos = containerHeight - 4;
+          } else if (newPos <= 0) {
+            scanLineDirectionRef.current = 1;
+            newPos = 0;
+          }
+          
+          return newPos;
+        });
+        lastTime = timestamp;
+      }
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(animate);
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isReady, paused, height]);
 
   const handleScanSuccess = useCallback((decodedText: string) => {
     const now = Date.now();
-    // Debounce: prevent duplicate scans within 1.5 seconds
-    if (decodedText && (decodedText !== lastScannedRef.current || now - lastScanTimeRef.current > 1500)) {
+    // Debounce: prevent duplicate scans of SAME barcode within 800ms
+    // But allow different barcodes immediately
+    if (decodedText && (decodedText !== lastScannedRef.current || now - lastScanTimeRef.current > 800)) {
       lastScannedRef.current = decodedText;
       lastScanTimeRef.current = now;
       console.log("Barcode scanned:", decodedText);
@@ -52,25 +94,47 @@ export const OptimizedScanner = ({
     const startScanner = async () => {
       try {
         // Create scanner instance
-        const html5Qrcode = new Html5Qrcode(containerId);
+        const html5Qrcode = new Html5Qrcode(containerId, {
+          verbose: false,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true // Use native BarcodeDetector API if available
+          }
+        });
         scannerRef.current = html5Qrcode;
 
-        // Get camera config based on device
-        // iOS needs different handling - use simpler constraints
+        // Aggressive scanning config - high FPS, full view scanning
         const config = {
-          fps: isIOS ? 10 : (isAndroid ? 15 : 30),
-          qrbox: undefined, // No scan box - scan full view
-          aspectRatio: isIOS ? 4 / 3 : 16 / 9, // iOS works better with 4:3
+          fps: isIOS ? 15 : 30, // Higher FPS for faster scanning
+          qrbox: undefined, // No scan box - scan full view for speed
+          aspectRatio: isIOS ? 4 / 3 : 16 / 9,
           disableFlip: false,
-          // iOS Safari needs simpler video constraints
+          formatsToSupport: [
+            0, // QR_CODE
+            1, // AZTEC
+            2, // CODABAR
+            3, // CODE_39
+            4, // CODE_93
+            5, // CODE_128
+            6, // DATA_MATRIX
+            7, // MAXICODE
+            8, // ITF
+            9, // EAN_13
+            10, // EAN_8
+            11, // PDF_417
+            12, // RSS_14
+            13, // RSS_EXPANDED
+            14, // UPC_A
+            15, // UPC_E
+            16, // UPC_EAN_EXTENSION
+          ],
           videoConstraints: isIOS ? {
             facingMode: { exact: "environment" },
             width: { min: 640, ideal: 1280, max: 1920 },
             height: { min: 480, ideal: 720, max: 1080 },
           } : {
             facingMode: "environment",
-            width: { ideal: isAndroid ? 1280 : 1920 },
-            height: { ideal: isAndroid ? 720 : 1080 },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
           } as MediaTrackConstraints,
         };
 
@@ -78,11 +142,10 @@ export const OptimizedScanner = ({
           { facingMode: "environment" },
           config,
           handleScanSuccess,
-          () => {} // Ignore scan failures (no barcode in view)
+          () => {} // Ignore scan failures (no barcode in view) - keep scanning
         );
 
-        // After camera starts, try to apply focus settings directly to the track
-        // iOS Safari requires a small delay before applying constraints
+        // Apply focus settings for better barcode detection
         const applyFocusSettings = async () => {
           try {
             const videoElement = document.querySelector(`#${containerId} video`) as HTMLVideoElement;
@@ -93,7 +156,6 @@ export const OptimizedScanner = ({
               
               // @ts-expect-error - focusMode is valid
               if (capabilities?.focusMode) {
-                // Apply continuous focus for both iOS and Android for better scanning
                 const constraints: MediaTrackConstraints = {};
                 
                 // @ts-expect-error - focusMode is valid
@@ -102,11 +164,10 @@ export const OptimizedScanner = ({
                   constraints.focusMode = "continuous";
                 }
                 
-                // For Android, also try to set a closer focus distance if available
                 // @ts-expect-error
                 if (isAndroid && capabilities.focusDistance) {
                   // @ts-expect-error
-                  constraints.focusDistance = 0.25;
+                  constraints.focusDistance = 0.3;
                 }
                 
                 if (Object.keys(constraints).length > 0) {
@@ -120,14 +181,13 @@ export const OptimizedScanner = ({
           }
         };
 
-        // Apply focus settings with delay for iOS
+        // Apply focus settings - iOS needs multiple attempts
         if (isIOS) {
-          // iOS needs multiple attempts - camera takes time to initialize
-          setTimeout(applyFocusSettings, 500);
-          setTimeout(applyFocusSettings, 1500);
-          setTimeout(applyFocusSettings, 3000);
+          setTimeout(applyFocusSettings, 300);
+          setTimeout(applyFocusSettings, 1000);
+          setTimeout(applyFocusSettings, 2000);
         } else {
-          applyFocusSettings();
+          setTimeout(applyFocusSettings, 100);
         }
 
         if (mounted) setIsReady(true);
@@ -141,8 +201,8 @@ export const OptimizedScanner = ({
       }
     };
 
-    // Delay start - iOS needs longer delay for camera initialization
-    const delay = isIOS ? 300 : (isAndroid ? 500 : 100);
+    // Short delay for camera initialization
+    const delay = isIOS ? 200 : 100;
     const timer = setTimeout(startScanner, delay);
 
     return () => {
@@ -181,6 +241,39 @@ export const OptimizedScanner = ({
         id={containerIdRef.current} 
         style={{ width: "100%", height: "100%" }}
       />
+      
+      {/* Red Scan Line */}
+      {isReady && !paused && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '5%',
+            right: '5%',
+            top: scanLinePosition,
+            height: '3px',
+            background: 'linear-gradient(90deg, transparent, #ff0000, #ff3333, #ff0000, transparent)',
+            boxShadow: '0 0 10px #ff0000, 0 0 20px #ff0000, 0 0 30px #ff0000',
+            borderRadius: '2px',
+            zIndex: 10,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      
+      {/* Corner brackets for scan area */}
+      {isReady && (
+        <>
+          {/* Top-left corner */}
+          <div style={{ position: 'absolute', top: 10, left: 10, width: 30, height: 30, borderTop: '3px solid #ff0000', borderLeft: '3px solid #ff0000', zIndex: 10 }} />
+          {/* Top-right corner */}
+          <div style={{ position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderTop: '3px solid #ff0000', borderRight: '3px solid #ff0000', zIndex: 10 }} />
+          {/* Bottom-left corner */}
+          <div style={{ position: 'absolute', bottom: 10, left: 10, width: 30, height: 30, borderBottom: '3px solid #ff0000', borderLeft: '3px solid #ff0000', zIndex: 10 }} />
+          {/* Bottom-right corner */}
+          <div style={{ position: 'absolute', bottom: 10, right: 10, width: 30, height: 30, borderBottom: '3px solid #ff0000', borderRight: '3px solid #ff0000', zIndex: 10 }} />
+        </>
+      )}
+      
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
           <p className="text-white text-sm">Starting camera...</p>
