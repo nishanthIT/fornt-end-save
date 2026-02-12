@@ -56,23 +56,21 @@ export const OptimizedScanner = ({
         scannerRef.current = html5Qrcode;
 
         // Get camera config based on device
+        // iOS needs different handling - use simpler constraints
         const config = {
-          fps: isAndroid ? 15 : 30,
+          fps: isIOS ? 10 : (isAndroid ? 15 : 30),
           qrbox: undefined, // No scan box - scan full view
-          aspectRatio: 16 / 9,
+          aspectRatio: isIOS ? 4 / 3 : 16 / 9, // iOS works better with 4:3
           disableFlip: false,
-          // Focus settings - continuous for iOS, none for Android (let device handle)
-          videoConstraints: {
+          // iOS Safari needs simpler video constraints
+          videoConstraints: isIOS ? {
+            facingMode: { exact: "environment" },
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 },
+          } : {
             facingMode: "environment",
             width: { ideal: isAndroid ? 1280 : 1920 },
             height: { ideal: isAndroid ? 720 : 1080 },
-            // These help reduce focus hunting
-            ...(isIOS && {
-              advanced: [{
-                // @ts-expect-error - valid constraint
-                focusMode: "continuous",
-              }]
-            }),
           } as MediaTrackConstraints,
         };
 
@@ -84,27 +82,52 @@ export const OptimizedScanner = ({
         );
 
         // After camera starts, try to apply focus settings directly to the track
-        try {
-          const videoElement = document.querySelector(`#${containerId} video`) as HTMLVideoElement;
-          if (videoElement?.srcObject) {
-            const stream = videoElement.srcObject as MediaStream;
-            const track = stream.getVideoTracks()[0];
-            const capabilities = track.getCapabilities?.();
-            
-            // @ts-expect-error - focusMode is valid
-            if (capabilities?.focusMode) {
-              // Apply continuous focus for iOS, or none/manual for Android
-              await track.applyConstraints({
+        // iOS Safari requires a small delay before applying constraints
+        const applyFocusSettings = async () => {
+          try {
+            const videoElement = document.querySelector(`#${containerId} video`) as HTMLVideoElement;
+            if (videoElement?.srcObject) {
+              const stream = videoElement.srcObject as MediaStream;
+              const track = stream.getVideoTracks()[0];
+              const capabilities = track.getCapabilities?.();
+              
+              // @ts-expect-error - focusMode is valid
+              if (capabilities?.focusMode) {
+                // Apply continuous focus for both iOS and Android for better scanning
+                const constraints: MediaTrackConstraints = {};
+                
+                // @ts-expect-error - focusMode is valid
+                if (capabilities.focusMode.includes("continuous")) {
+                  // @ts-expect-error
+                  constraints.focusMode = "continuous";
+                }
+                
+                // For Android, also try to set a closer focus distance if available
                 // @ts-expect-error
-                focusMode: isIOS ? "continuous" : "manual",
-                // @ts-expect-error  
-                ...(isAndroid && capabilities.focusDistance && { focusDistance: 0.25 }),
-              });
-              console.log("Applied focus constraints");
+                if (isAndroid && capabilities.focusDistance) {
+                  // @ts-expect-error
+                  constraints.focusDistance = 0.25;
+                }
+                
+                if (Object.keys(constraints).length > 0) {
+                  await track.applyConstraints(constraints);
+                  console.log("Applied focus constraints:", constraints);
+                }
+              }
             }
+          } catch (focusErr) {
+            console.log("Focus constraints not supported, using defaults");
           }
-        } catch (focusErr) {
-          console.log("Focus constraints not supported, using defaults");
+        };
+
+        // Apply focus settings with delay for iOS
+        if (isIOS) {
+          // iOS needs multiple attempts - camera takes time to initialize
+          setTimeout(applyFocusSettings, 500);
+          setTimeout(applyFocusSettings, 1500);
+          setTimeout(applyFocusSettings, 3000);
+        } else {
+          applyFocusSettings();
         }
 
         if (mounted) setIsReady(true);
@@ -118,8 +141,8 @@ export const OptimizedScanner = ({
       }
     };
 
-    // Delay start slightly for Android
-    const delay = isAndroid ? 500 : 100;
+    // Delay start - iOS needs longer delay for camera initialization
+    const delay = isIOS ? 300 : (isAndroid ? 500 : 100);
     const timer = setTimeout(startScanner, delay);
 
     return () => {
