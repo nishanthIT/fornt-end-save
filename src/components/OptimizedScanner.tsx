@@ -9,10 +9,6 @@ interface OptimizedScannerProps {
   paused?: boolean;
 }
 
-// Check if device is Android or iOS
-const isAndroid = /android/i.test(navigator.userAgent);
-const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-
 /**
  * OptimizedScanner - Fast barcode scanner using html5-qrcode
  * Optimized for both Android and iOS with proper focus handling
@@ -29,21 +25,14 @@ export const OptimizedScanner = ({
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [isReady, setIsReady] = useState(false);
   const [scanLinePosition, setScanLinePosition] = useState(0);
-  const [retryCount, setRetryCount] = useState(0); // Track retries to force re-init
+  const [key, setKey] = useState(0); // Force remount on retry
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerIdRef = useRef(`scanner-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const lastScannedRef = useRef<string>("");
   const lastScanTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number | null>(null);
   const scanLineDirectionRef = useRef(1); // 1 = down, -1 = up
-  const timeoutsRef = useRef<NodeJS.Timeout[]>([]); // Track all timeouts for cleanup
-  const isScanningRef = useRef(false); // Prevent race conditions
-
-  // Clear all tracked timeouts
-  const clearAllTimeouts = useCallback(() => {
-    timeoutsRef.current.forEach(t => clearTimeout(t));
-    timeoutsRef.current = [];
-  }, []);
+  const mountedRef = useRef(true);
 
   // Animate the red scan line
   useEffect(() => {
@@ -93,40 +82,16 @@ export const OptimizedScanner = ({
     }
   }, [onScan]);
 
-  // Stop scanner safely
-  const stopScanner = useCallback(async () => {
-    clearAllTimeouts();
-    
-    if (scannerRef.current && isScanningRef.current) {
-      try {
-        isScanningRef.current = false;
-        await scannerRef.current.stop();
-        console.log("Scanner stopped successfully");
-      } catch (err) {
-        console.log("Scanner stop error (may already be stopped):", err);
-      }
-    }
-    scannerRef.current = null;
-  }, [clearAllTimeouts]);
-
   useEffect(() => {
-    if (paused) {
-      stopScanner();
-      return;
-    }
+    if (paused) return;
     
-    let mounted = true;
+    mountedRef.current = true;
     const containerId = containerIdRef.current;
+    let html5Qrcode: Html5Qrcode | null = null;
 
     const startScanner = async () => {
-      // Ensure previous scanner is stopped
-      await stopScanner();
-      
-      if (!mounted) return;
-      
       try {
-        // Create scanner instance
-        const html5Qrcode = new Html5Qrcode(containerId, {
+        html5Qrcode = new Html5Qrcode(containerId, {
           verbose: false,
           experimentalFeatures: {
             useBarCodeDetectorIfSupported: true
@@ -134,20 +99,13 @@ export const OptimizedScanner = ({
         });
         scannerRef.current = html5Qrcode;
 
-        // Scanning config
+        // Simple config - works on both Android and iOS
         const config = {
-          fps: isIOS ? 10 : 20, // Moderate FPS to avoid overload
+          fps: 30,
           qrbox: undefined,
-          aspectRatio: isIOS ? 4 / 3 : 16 / 9,
+          aspectRatio: 16 / 9,
           disableFlip: false,
-          formatsToSupport: [
-            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
-          ],
-          videoConstraints: isIOS ? {
-            facingMode: { exact: "environment" },
-            width: { min: 640, ideal: 1280, max: 1920 },
-            height: { min: 480, ideal: 720, max: 1080 },
-          } : {
+          videoConstraints: {
             facingMode: "environment",
             width: { ideal: 1280 },
             height: { ideal: 720 },
@@ -161,56 +119,35 @@ export const OptimizedScanner = ({
           () => {} // Ignore failures - keep scanning
         );
 
-        isScanningRef.current = true;
+        console.log("Scanner started successfully");
 
-        // Apply focus settings
-        const applyFocusSettings = async () => {
-          if (!mounted || !isScanningRef.current) return;
-          
+        // Apply focus settings after camera starts
+        setTimeout(async () => {
+          if (!mountedRef.current) return;
           try {
             const videoElement = document.querySelector(`#${containerId} video`) as HTMLVideoElement;
             if (videoElement?.srcObject) {
               const stream = videoElement.srcObject as MediaStream;
               const track = stream.getVideoTracks()[0];
-              if (!track) return;
-              
-              const capabilities = track.getCapabilities?.();
-              
-              // @ts-expect-error - focusMode is valid
-              if (capabilities?.focusMode) {
-                const constraints: MediaTrackConstraints = {};
-                
+              if (track) {
+                const capabilities = track.getCapabilities?.();
                 // @ts-expect-error
-                if (capabilities.focusMode.includes("continuous")) {
+                if (capabilities?.focusMode?.includes("continuous")) {
                   // @ts-expect-error
-                  constraints.focusMode = "continuous";
-                }
-                
-                if (Object.keys(constraints).length > 0) {
-                  await track.applyConstraints(constraints);
-                  console.log("Applied focus constraints");
+                  await track.applyConstraints({ focusMode: "continuous" });
+                  console.log("Applied continuous focus");
                 }
               }
             }
-          } catch (focusErr) {
-            // Ignore focus errors - not critical
+          } catch (e) {
+            // Ignore focus errors
           }
-        };
+        }, 500);
 
-        // Apply focus with tracked timeouts
-        const t1 = setTimeout(applyFocusSettings, 500);
-        timeoutsRef.current.push(t1);
-        
-        if (isIOS) {
-          const t2 = setTimeout(applyFocusSettings, 1500);
-          timeoutsRef.current.push(t2);
-        }
-
-        if (mounted) setIsReady(true);
+        if (mountedRef.current) setIsReady(true);
       } catch (err) {
         console.error("Scanner error:", err);
-        isScanningRef.current = false;
-        if (mounted) {
+        if (mountedRef.current) {
           setHasError(true);
           setErrorMessage(err instanceof Error ? err.message : String(err));
           onError?.(err instanceof Error ? err : new Error(String(err)));
@@ -218,31 +155,28 @@ export const OptimizedScanner = ({
       }
     };
 
-    // Delay start
-    const delay = isIOS ? 300 : 150;
-    const timer = setTimeout(startScanner, delay);
-    timeoutsRef.current.push(timer);
+    // Small delay before starting
+    const timer = setTimeout(startScanner, 100);
 
     return () => {
-      mounted = false;
-      clearAllTimeouts();
-      stopScanner();
+      mountedRef.current = false;
+      clearTimeout(timer);
+      if (html5Qrcode) {
+        html5Qrcode.stop().catch(() => {});
+      }
+      scannerRef.current = null;
     };
-  }, [paused, handleScanSuccess, onError, stopScanner, clearAllTimeouts, retryCount]);
+  }, [paused, handleScanSuccess, onError, key]);
 
   // Handle retry - reset everything
   const handleRetry = useCallback(() => {
-    // Reset all scan state
     lastScannedRef.current = "";
     lastScanTimeRef.current = 0;
-    
-    // Generate new container ID to force fresh DOM element
     containerIdRef.current = `scanner-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
     setHasError(false);
     setErrorMessage("");
     setIsReady(false);
-    setRetryCount(prev => prev + 1); // Force useEffect to re-run
+    setKey(prev => prev + 1);
   }, []);
 
   if (hasError) {
@@ -262,7 +196,7 @@ export const OptimizedScanner = ({
   }
 
   return (
-    <div style={{ width, height }} className="overflow-hidden rounded-md bg-black relative">
+    <div key={key} style={{ width, height }} className="overflow-hidden rounded-md bg-black relative">
       <div 
         id={containerIdRef.current} 
         style={{ width: "100%", height: "100%" }}
