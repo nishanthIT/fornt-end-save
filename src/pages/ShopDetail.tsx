@@ -939,8 +939,8 @@ const ShopDetail = () => {
             <div className="space-y-2">
               <label className="block font-semibold">Case Size</label>
               <Input
-                type="number"
-                placeholder="Enter Case Size"
+                type="text"
+                placeholder="e.g. 1, 12, 500ml"
                 value={addProductcaseSize}
                 onChange={(e) => setAddProductcaseSize(e.target.value)}
               />
@@ -949,8 +949,8 @@ const ShopDetail = () => {
             <div className="space-y-2">
               <label className="block font-semibold">Packet Size</label>
               <Input
-                type="number"
-                placeholder="Enter Packet Size"
+                type="text"
+                placeholder="e.g. 1, 500ml, 1kg"
                 value={addProductpacketSize}
                 onChange={(e) => setAddProductpacketSize(e.target.value)}
               />
