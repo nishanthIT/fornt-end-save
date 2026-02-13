@@ -49,10 +49,25 @@ const Products = () => {
   const [addBarcode, setAddBarcode] = useState<string>("");
   const [addCaseBarcode, setAddCaseBarcode] = useState<string>("");
   const [productName, setProductName] = useState<string>("");
-  const [caseSize, setCaseSize] = useState<string>("");
-  const [packetSize, setPacketSize] = useState<string>("");
-  const [retailSize, setRetailSize] = useState<string>("");
+  const [caseSize, setCaseSize] = useState<string>("1");
+  const [packetSize, setPacketSize] = useState<string>("1");
+  const [retailSize, setRetailSize] = useState<string>("1");
   const [rrp, setRrp] = useState<string>("");
+
+  // Helper function to format price input (456 -> 4.56, 45 -> 0.45, 1 -> 0.01)
+  const formatPriceInput = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (!digits) return '';
+    const num = parseInt(digits, 10);
+    return (num / 100).toFixed(2);
+  };
+
+  // Handle price input change
+  const handlePriceInputChange = (value: string, setter: (val: string) => void) => {
+    const cleanValue = value.replace(/[^0-9]/g, '');
+    const formatted = formatPriceInput(cleanValue);
+    setter(formatted);
+  };
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(false);
@@ -301,9 +316,9 @@ const Products = () => {
     setAddBarcode("");
     setAddCaseBarcode("");
     setProductName("");
-    setCaseSize("");
-    setPacketSize("");
-    setRetailSize("");
+    setCaseSize("1");
+    setPacketSize("1");
+    setRetailSize("1");
     setRrp("");
     setSelectedImage(null);
     setImagePreview(null);
@@ -368,61 +383,87 @@ const Products = () => {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Input
-                    placeholder="Product Name"
-                    value={productName}
-                    onChange={(e) => setProductName(e.target.value)}
-                  />
-                  <div className="relative">
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Product Name</label>
                     <Input
-                      placeholder="Barcode"
-                      value={addBarcode}
-                      onChange={(e) => setAddBarcode(e.target.value)}
+                      placeholder="Enter product name"
+                      value={productName}
+                      onChange={(e) => setProductName(e.target.value)}
                     />
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="absolute right-1 top-1/2 -translate-y-1/2"
-                      onClick={() => setIsAddScannerOpen(true)}
-                    >
-                      <Barcode className="h-4 w-4" />
-                    </Button>
                   </div>
-                  <div className="relative">
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Barcode</label>
+                    <div className="relative">
+                      <Input
+                        placeholder="Scan or enter barcode"
+                        value={addBarcode}
+                        onChange={(e) => setAddBarcode(e.target.value)}
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute right-1 top-1/2 -translate-y-1/2"
+                        onClick={() => setIsAddScannerOpen(true)}
+                      >
+                        <Barcode className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Case Barcode (Optional)</label>
+                    <div className="relative">
+                      <Input
+                        placeholder="Case barcode"
+                        value={addCaseBarcode}
+                        onChange={(e) => setAddCaseBarcode(e.target.value)}
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute right-1 top-1/2 -translate-y-1/2"
+                        onClick={() => setIsCaseBarcodeAddScannerOpen(true)}
+                      >
+                        <Barcode className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Case Size</label>
                     <Input
-                      placeholder="Case Barcode (Optional)"
-                      value={addCaseBarcode}
-                      onChange={(e) => setAddCaseBarcode(e.target.value)}
+                      placeholder="1"
+                      value={caseSize}
+                      onChange={(e) => setCaseSize(e.target.value)}
                     />
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="absolute right-1 top-1/2 -translate-y-1/2"
-                      onClick={() => setIsCaseBarcodeAddScannerOpen(true)}
-                    >
-                      <Barcode className="h-4 w-4" />
-                    </Button>
                   </div>
-                  <Input
-                    placeholder="Case Size"
-                    value={caseSize}
-                    onChange={(e) => setCaseSize(e.target.value)}
-                  />
-                  <Input
-                    placeholder="Packet Size"
-                    value={packetSize}
-                    onChange={(e) => setPacketSize(e.target.value)}
-                  />
-                  <Input
-                    placeholder="Retail Size"
-                    value={retailSize}
-                    onChange={(e) => setRetailSize(e.target.value)}
-                  />
-                  <Input
-                    placeholder="RRP"
-                    value={rrp}
-                    onChange={(e) => setRrp(e.target.value)}
-                  />
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Packet Size</label>
+                    <Input
+                      placeholder="1"
+                      value={packetSize}
+                      onChange={(e) => setPacketSize(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Retail Size</label>
+                    <Input
+                      placeholder="1"
+                      value={retailSize}
+                      onChange={(e) => setRetailSize(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">RRP (e.g. 456 = £4.56)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                      <Input
+                        className="pl-7"
+                        placeholder="0.00"
+                        value={rrp}
+                        onChange={(e) => handlePriceInputChange(e.target.value, setRrp)}
+                        inputMode="numeric"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Image Upload */}
