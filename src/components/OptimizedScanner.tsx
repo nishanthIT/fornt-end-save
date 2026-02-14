@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { Scanner } from "@yudiel/react-qr-scanner";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 interface OptimizedScannerProps {
   onScan: (result: string) => void;
@@ -9,10 +9,15 @@ interface OptimizedScannerProps {
   paused?: boolean;
 }
 
+// Detect if the device is Android
+const isAndroid = () => {
+  return /android/i.test(navigator.userAgent);
+};
+
 /**
- * OptimizedScanner - Fast barcode scanner using html5-qrcode
- * Optimized for both Android and iOS with proper focus handling
- * Features: Red scan line animation, continuous aggressive scanning
+ * OptimizedScanner - A barcode/QR scanner with better autofocus performance
+ * Uses @yudiel/react-qr-scanner which has better camera handling
+ * Optimized for iPhone and Samsung devices with focus constraints
  */
 export const OptimizedScanner = ({
   onScan,
@@ -21,172 +26,194 @@ export const OptimizedScanner = ({
   height = 250,
   paused = false,
 }: OptimizedScannerProps) => {
-  const [hasError, setHasError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [scannerKey, setScannerKey] = useState(0); // Key to force re-mount scanner
   const [isReady, setIsReady] = useState(false);
-  const [scanLinePosition, setScanLinePosition] = useState(0);
-  const [key, setKey] = useState(0); // Force remount on retry
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const containerIdRef = useRef(`scanner-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
-  const lastScannedRef = useRef<string>("");
-  const lastScanTimeRef = useRef<number>(0);
-  const animationFrameRef = useRef<number | null>(null);
-  const scanLineDirectionRef = useRef(1); // 1 = down, -1 = up
   const mountedRef = useRef(true);
+  const retryCountRef = useRef(0);
+  const maxRetries = 3;
 
-  // Animate the red scan line
-  useEffect(() => {
-    if (!isReady || paused) return;
-    
-    let lastTime = 0;
-    const speed = 2; // pixels per frame
-    
-    const animate = (timestamp: number) => {
-      if (timestamp - lastTime >= 16) { // ~60fps
-        setScanLinePosition(prev => {
-          const containerHeight = typeof height === 'number' ? height : 250;
-          let newPos = prev + (speed * scanLineDirectionRef.current);
-          
-          if (newPos >= containerHeight - 4) {
-            scanLineDirectionRef.current = -1;
-            newPos = containerHeight - 4;
-          } else if (newPos <= 0) {
-            scanLineDirectionRef.current = 1;
-            newPos = 0;
-          }
-          
-          return newPos;
-        });
-        lastTime = timestamp;
+  // Release any existing camera streams before starting
+  const releaseAllCameras = useCallback(async () => {
+    try {
+      // Get all media devices and stop any active video tracks
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      
+      // Try to get and immediately release each camera to clear any locks
+      for (const device of videoDevices) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: device.deviceId }
+          });
+          stream.getTracks().forEach(track => {
+            track.stop();
+          });
+        } catch {
+          // Ignore errors for individual devices
+        }
       }
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-    
-    animationFrameRef.current = requestAnimationFrame(animate);
-    
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [isReady, paused, height]);
-
-  const handleScanSuccess = useCallback((decodedText: string) => {
-    const now = Date.now();
-    // Allow same barcode after 500ms, different barcodes immediately
-    if (decodedText && (decodedText !== lastScannedRef.current || now - lastScanTimeRef.current > 500)) {
-      lastScannedRef.current = decodedText;
-      lastScanTimeRef.current = now;
-      console.log("Barcode scanned:", decodedText);
-      onScan(decodedText);
+    } catch (error) {
+      console.warn("Could not release cameras:", error);
     }
-  }, [onScan]);
+  }, []);
 
   useEffect(() => {
-    if (paused) return;
-    
     mountedRef.current = true;
-    const containerId = containerIdRef.current;
-    let html5Qrcode: Html5Qrcode | null = null;
-
-    const startScanner = async () => {
+    
+    // Check camera permission on mount - don't hold the stream
+    const initCamera = async () => {
       try {
-        html5Qrcode = new Html5Qrcode(containerId, {
-          verbose: false,
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-          }
+        // On Android, first try to release any locked cameras
+        if (isAndroid()) {
+          await releaseAllCameras();
+          // Small delay after releasing to let the camera fully reset
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        
+        // Just check permission status without holding the stream
+        const permissionStatus = await navigator.permissions.query({ 
+          name: 'camera' as PermissionName 
         });
-        scannerRef.current = html5Qrcode;
-
-        // Simple config - works on both Android and iOS
-        const config = {
-          fps: 30,
-          qrbox: undefined,
-          aspectRatio: 16 / 9,
-          disableFlip: false,
-          videoConstraints: {
-            facingMode: "environment",
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          } as MediaTrackConstraints,
-        };
-
-        await html5Qrcode.start(
-          { facingMode: "environment" },
-          config,
-          handleScanSuccess,
-          () => {} // Ignore failures - keep scanning
-        );
-
-        console.log("Scanner started successfully");
-
-        // Apply focus settings after camera starts
-        setTimeout(async () => {
-          if (!mountedRef.current) return;
-          try {
-            const videoElement = document.querySelector(`#${containerId} video`) as HTMLVideoElement;
-            if (videoElement?.srcObject) {
-              const stream = videoElement.srcObject as MediaStream;
-              const track = stream.getVideoTracks()[0];
-              if (track) {
-                const capabilities = track.getCapabilities?.();
-                // @ts-expect-error
-                if (capabilities?.focusMode?.includes("continuous")) {
-                  // @ts-expect-error
-                  await track.applyConstraints({ focusMode: "continuous" });
-                  console.log("Applied continuous focus");
-                }
-              }
+        
+        if (!mountedRef.current) return;
+        
+        if (permissionStatus.state === 'granted') {
+          setHasPermission(true);
+          setCameraError(null);
+          // Delay to ensure camera is fully available
+          setTimeout(() => {
+            if (mountedRef.current) {
+              setIsReady(true);
             }
-          } catch (e) {
-            // Ignore focus errors
+          }, isAndroid() ? 500 : 100);
+        } else if (permissionStatus.state === 'prompt') {
+          // Request permission by briefly accessing the camera
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+              video: { facingMode: "environment" } 
+            });
+            stream.getTracks().forEach(track => track.stop());
+            
+            if (!mountedRef.current) return;
+            
+            setHasPermission(true);
+            setCameraError(null);
+            setTimeout(() => {
+              if (mountedRef.current) {
+                setIsReady(true);
+              }
+            }, isAndroid() ? 500 : 100);
+          } catch (error) {
+            if (!mountedRef.current) return;
+            handleCameraError(error);
           }
-        }, 500);
-
-        if (mountedRef.current) setIsReady(true);
-      } catch (err) {
-        console.error("Scanner error:", err);
-        if (mountedRef.current) {
-          setHasError(true);
-          setErrorMessage(err instanceof Error ? err.message : String(err));
-          onError?.(err instanceof Error ? err : new Error(String(err)));
+        } else {
+          setHasPermission(false);
+          setCameraError("Camera permission denied");
+        }
+      } catch (error) {
+        // Fallback for browsers that don't support permissions.query for camera
+        if (!mountedRef.current) return;
+        
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: "environment" } 
+          });
+          stream.getTracks().forEach(track => track.stop());
+          
+          if (!mountedRef.current) return;
+          
+          setHasPermission(true);
+          setCameraError(null);
+          setTimeout(() => {
+            if (mountedRef.current) {
+              setIsReady(true);
+            }
+          }, isAndroid() ? 500 : 100);
+        } catch (fallbackError) {
+          if (!mountedRef.current) return;
+          handleCameraError(fallbackError);
         }
       }
     };
-
-    // Small delay before starting
-    const timer = setTimeout(startScanner, 100);
-
+    
+    initCamera();
+    
+    // Cleanup on unmount
     return () => {
       mountedRef.current = false;
-      clearTimeout(timer);
-      if (html5Qrcode) {
-        html5Qrcode.stop().catch(() => {});
-      }
-      scannerRef.current = null;
+      setIsReady(false);
     };
-  }, [paused, handleScanSuccess, onError, key]);
+  }, [releaseAllCameras]);
 
-  // Handle retry - reset everything
-  const handleRetry = useCallback(() => {
-    lastScannedRef.current = "";
-    lastScanTimeRef.current = 0;
-    containerIdRef.current = `scanner-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    setHasError(false);
-    setErrorMessage("");
-    setIsReady(false);
-    setKey(prev => prev + 1);
+  const handleCameraError = (error: unknown) => {
+    console.error("Camera error:", error);
+    setHasPermission(false);
+    if (error instanceof Error) {
+      setCameraError(error.message);
+    } else {
+      setCameraError("Failed to access camera");
+    }
+  };
+
+  // Retry mechanism for Android camera issues
+  const handleScannerError = useCallback((error: unknown) => {
+    console.error("Scanner error:", error);
+    
+    if (isAndroid() && retryCountRef.current < maxRetries) {
+      retryCountRef.current++;
+      console.log(`Retrying camera... attempt ${retryCountRef.current}/${maxRetries}`);
+      
+      // Reset and retry
+      setIsReady(false);
+      setTimeout(async () => {
+        if (!mountedRef.current) return;
+        
+        await releaseAllCameras();
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        if (mountedRef.current) {
+          setScannerKey(prev => prev + 1); // Force re-mount
+          setIsReady(true);
+        }
+      }, 1000);
+    } else {
+      onError?.(error instanceof Error ? error : new Error(String(error)));
+    }
+  }, [onError, releaseAllCameras]);
+
+  // Get constraints based on device type - Android needs simpler constraints
+  const getConstraints = useCallback((): MediaTrackConstraints => {
+    if (isAndroid()) {
+      // Very simplified constraints for Android - maximum compatibility
+      return {
+        facingMode: "environment",
+      };
+    }
+    
+    // iOS and other devices can use more advanced constraints
+    return {
+      facingMode: "environment",
+      width: { ideal: 1280, min: 640 },
+      height: { ideal: 720, min: 480 },
+      // Request continuous autofocus for faster focusing (iOS supported)
+      advanced: [
+        { focusMode: "continuous" } as MediaTrackConstraintSet,
+      ],
+    };
   }, []);
 
-  if (hasError) {
+  if (hasPermission === false) {
     return (
-      <div className="flex flex-col items-center justify-center bg-gray-100 rounded-md p-4" style={{ width, height: typeof height === 'number' ? height : 250 }}>
+      <div className="flex flex-col items-center justify-center bg-gray-100 rounded-md p-4" style={{ width, height }}>
         <p className="text-sm text-gray-500 text-center">
-          Camera error: {errorMessage}
+          Camera permission denied. Please allow camera access to scan barcodes.
+          {cameraError && <span className="block mt-1 text-xs text-red-500">{cameraError}</span>}
         </p>
         <button 
-          onClick={handleRetry}
+          onClick={() => window.location.reload()} 
           className="mt-3 px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
         >
           Retry
@@ -195,46 +222,55 @@ export const OptimizedScanner = ({
     );
   }
 
+  // Show loading state while camera is initializing
+  if (!isReady || hasPermission === null) {
+    return (
+      <div className="flex items-center justify-center bg-gray-100 rounded-md p-4" style={{ width, height }}>
+        <p className="text-sm text-gray-500 text-center">
+          Initializing camera...
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div key={key} style={{ width, height }} className="overflow-hidden rounded-md bg-black relative">
-      <div 
-        id={containerIdRef.current} 
-        style={{ width: "100%", height: "100%" }}
+    <div style={{ width, height }} className="overflow-hidden rounded-md">
+      <Scanner
+        key={scannerKey}
+        onScan={(result) => {
+          if (result && result.length > 0 && result[0].rawValue) {
+            retryCountRef.current = 0; // Reset retry count on successful scan
+            onScan(result[0].rawValue);
+          }
+        }}
+        onError={handleScannerError}
+        paused={paused}
+        scanDelay={isAndroid() ? 500 : 300} // Slower scan rate on Android for stability
+        constraints={getConstraints()}
+        styles={{
+          container: {
+            width: "100%",
+            height: "100%",
+          },
+          video: {
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          },
+        }}
+        formats={[
+          "ean_13",
+          "ean_8",
+          "code_128",
+          "code_39",
+          "code_93",
+          "upc_a",
+          "upc_e",
+          "itf",
+          "qr_code",
+          "data_matrix",
+        ]}
       />
-      
-      {/* Red Scan Line */}
-      {isReady && !paused && (
-        <div
-          style={{
-            position: 'absolute',
-            left: '5%',
-            right: '5%',
-            top: scanLinePosition,
-            height: '3px',
-            background: 'linear-gradient(90deg, transparent, #ff0000, #ff3333, #ff0000, transparent)',
-            boxShadow: '0 0 10px #ff0000, 0 0 20px #ff0000, 0 0 30px #ff0000',
-            borderRadius: '2px',
-            zIndex: 10,
-            pointerEvents: 'none',
-          }}
-        />
-      )}
-      
-      {/* Corner brackets for scan area */}
-      {isReady && (
-        <>
-          <div style={{ position: 'absolute', top: 10, left: 10, width: 30, height: 30, borderTop: '3px solid #ff0000', borderLeft: '3px solid #ff0000', zIndex: 10 }} />
-          <div style={{ position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderTop: '3px solid #ff0000', borderRight: '3px solid #ff0000', zIndex: 10 }} />
-          <div style={{ position: 'absolute', bottom: 10, left: 10, width: 30, height: 30, borderBottom: '3px solid #ff0000', borderLeft: '3px solid #ff0000', zIndex: 10 }} />
-          <div style={{ position: 'absolute', bottom: 10, right: 10, width: 30, height: 30, borderBottom: '3px solid #ff0000', borderRight: '3px solid #ff0000', zIndex: 10 }} />
-        </>
-      )}
-      
-      {!isReady && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-          <p className="text-white text-sm">Starting camera...</p>
-        </div>
-      )}
     </div>
   );
 };
