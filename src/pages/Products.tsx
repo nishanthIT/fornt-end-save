@@ -141,7 +141,7 @@ const Products = () => {
   }, [searchQuery, filters, currentPage]);
 
   // Updated hook to use filters and pagination
-  const { products, loading, error, pagination } = useFetchProducts(
+  const { products, loading, error, pagination, refetch } = useFetchProducts(
     searchQuery, 
     filters, 
     currentPage, 
@@ -582,7 +582,7 @@ const Products = () => {
             <p className="text-center py-8 text-muted-foreground">No products found</p>
           )}
           {products.map((product) => (
-            <ProductCard key={product.id} {...product} />
+            <ProductCard key={product.id} {...product} onProductUpdated={refetch} />
           ))}
         </div>
 

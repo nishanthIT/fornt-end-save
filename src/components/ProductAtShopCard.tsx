@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Calendar, Tag, Clock, PoundSterling } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Calendar, Tag, Clock, PoundSterling, Pencil, Upload, X } from "lucide-react";
 import { getImageUrl } from "@/utils/imageUtils";
+import { toast } from "sonner";
 
 interface ProductAtShopCardProps {
   productId: string;
@@ -23,6 +25,7 @@ interface ProductAtShopCardProps {
   rrp: number;
   onPriceUpdate: (productId: string, newPrice: number) => void;
   onOfferUpdate: (productId: string, regularPrice: number, offerPrice: number | null, offerExpiryDate: string | null) => void;
+  onProductUpdated?: () => void;
 }
 
 // Helper function to calculate days remaining
@@ -82,6 +85,7 @@ export const ProductAtShopCard = ({
   rrp,
   onPriceUpdate,
   onOfferUpdate,
+  onProductUpdated,
 }: ProductAtShopCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editPrice, setEditPrice] = useState(price.toString());
@@ -89,6 +93,20 @@ export const ProductAtShopCard = ({
   const [editOfferExpiryDate, setEditOfferExpiryDate] = useState(
     offerExpiryDate ? new Date(offerExpiryDate).toISOString().slice(0, 10) : ""
   );
+
+  // Edit Product Dialog state
+  const [showEditProductDialog, setShowEditProductDialog] = useState(false);
+  const [editProductTitle, setEditProductTitle] = useState(title);
+  const [editProductCaseSize, setEditProductCaseSize] = useState(caseSize);
+  const [editProductPacketSize, setEditProductPacketSize] = useState(packetSize);
+  const [editProductRetailSize, setEditProductRetailSize] = useState(retailSize);
+  const [editProductRrp, setEditProductRrp] = useState(rrp.toString());
+  const [editProductBarcode, setEditProductBarcode] = useState(barcode);
+  const [editProductCaseBarcode, setEditProductCaseBarcode] = useState(caseBarcode || "");
+  const [isEditingProduct, setIsEditingProduct] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentPrice = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date() ? offerPrice : price;
   const hasActiveOffer = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date();
@@ -177,6 +195,84 @@ export const ProductAtShopCard = ({
     setIsEditing(false);
   };
 
+  // Handle image selection
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Handle editing the product itself
+  const handleEditProductSave = async () => {
+    if (!editProductTitle.trim()) {
+      toast.error("Title is required");
+      return;
+    }
+
+    setIsEditingProduct(true);
+    try {
+      const authToken = localStorage.getItem("auth_token");
+      
+      // Use FormData to support file upload
+      const formData = new FormData();
+      formData.append("title", editProductTitle);
+      formData.append("caseSize", editProductCaseSize);
+      formData.append("packetSize", editProductPacketSize);
+      formData.append("retailSize", editProductRetailSize);
+      formData.append("rrp", String(parseFloat(editProductRrp) || 0));
+      formData.append("barcode", editProductBarcode);
+      formData.append("caseBarcode", editProductCaseBarcode || "");
+      
+      if (selectedImage) {
+        formData.append("image", selectedImage);
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/editProduct/${productId}`,
+        {
+          method: "PUT",
+          headers: {
+            ...(authToken && { Authorization: `Bearer ${authToken}` }),
+          },
+          body: formData,
+        }
+      );
+
+      if (response.ok) {
+        toast.success("Product updated successfully");
+        setShowEditProductDialog(false);
+        setSelectedImage(null);
+        setImagePreview(null);
+        // Refresh data without page reload
+        if (onProductUpdated) {
+          onProductUpdated();
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to update product");
+      }
+    } catch (error) {
+      console.error("Error updating product:", error);
+      toast.error("Error updating product");
+    } finally {
+      setIsEditingProduct(false);
+    }
+  };
+
   return (
     <Card className={`product-card w-full ${hasActiveOffer ? 'ring-2 ring-orange-400 bg-orange-50' : ''}`}>
       <CardContent className="p-3 sm:p-4">
@@ -230,14 +326,36 @@ export const ProductAtShopCard = ({
                   RRP: £{rrp.toFixed(2)}
                 </div>
               )}
-              <Button
-                variant={hasActiveOffer ? "default" : "outline"}
-                size="sm"
-                onClick={() => setIsEditing(true)}
-                className={`mt-1 h-5 px-2 text-[10px] ${hasActiveOffer ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
-              >
-                Edit
-              </Button>
+              <div className="flex gap-3 mt-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditProductTitle(title);
+                    setEditProductCaseSize(caseSize);
+                    setEditProductPacketSize(packetSize);
+                    setEditProductRetailSize(retailSize);
+                    setEditProductRrp(rrp.toString());
+                    setEditProductBarcode(barcode);
+                    setEditProductCaseBarcode(caseBarcode || "");
+                    setSelectedImage(null);
+                    setImagePreview(null);
+                    setShowEditProductDialog(true);
+                  }}
+                  className="h-7 w-7 p-0"
+                  title="Edit Product"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={hasActiveOffer ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setIsEditing(true)}
+                  className={`h-5 px-2 text-[10px] ${hasActiveOffer ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
+                >
+                  Edit
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -331,6 +449,150 @@ export const ProductAtShopCard = ({
           </div>
         )}
       </CardContent>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={showEditProductDialog} onOpenChange={setShowEditProductDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium">Title</label>
+              <Input
+                value={editProductTitle}
+                onChange={(e) => setEditProductTitle(e.target.value)}
+                placeholder="Product title"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium">Case Size</label>
+                <Input
+                  value={editProductCaseSize}
+                  onChange={(e) => setEditProductCaseSize(e.target.value)}
+                  placeholder="e.g. 12"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Packet Size</label>
+                <Input
+                  value={editProductPacketSize}
+                  onChange={(e) => setEditProductPacketSize(e.target.value)}
+                  placeholder="e.g. 6"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Retail Size</label>
+              <Input
+                value={editProductRetailSize}
+                onChange={(e) => setEditProductRetailSize(e.target.value)}
+                placeholder="e.g. 500ml"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">RRP (e.g. 456 = £4.56)</label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={editProductRrp}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, '');
+                  if (!digits) { setEditProductRrp(''); return; }
+                  const pence = parseInt(digits, 10);
+                  setEditProductRrp((pence / 100).toFixed(2));
+                }}
+                placeholder="e.g. 456 = £4.56"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium">Barcode</label>
+                <Input
+                  value={editProductBarcode}
+                  onChange={(e) => setEditProductBarcode(e.target.value)}
+                  placeholder="Barcode"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Case Barcode</label>
+                <Input
+                  value={editProductCaseBarcode}
+                  onChange={(e) => setEditProductCaseBarcode(e.target.value)}
+                  placeholder="Case barcode"
+                />
+              </div>
+            </div>
+
+            {/* Current Image */}
+            <div>
+              <label className="text-sm font-medium">Current Image</label>
+              <img
+                src={getImageUrl(img)}
+                alt={title}
+                className="w-16 h-16 object-cover rounded-md mt-1"
+              />
+            </div>
+
+            {/* Image Upload */}
+            <div>
+              <label className="text-sm font-medium">Upload New Image (Optional)</label>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageChange}
+                accept="image/*"
+                className="hidden"
+              />
+              {imagePreview ? (
+                <div className="relative w-16 h-16 mt-1">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-full h-full object-cover rounded-md"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="mt-1"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Choose Image
+                </Button>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowEditProductDialog(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleEditProductSave}
+                disabled={isEditingProduct}
+                className="flex-1"
+              >
+                {isEditingProduct ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

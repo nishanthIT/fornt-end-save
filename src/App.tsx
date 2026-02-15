@@ -135,6 +135,8 @@ import Employees from "./pages/Employees";
 import Chat from "./pages/Chat";
 import PriceCorrections from "./pages/PriceCorrections";
 import PromotionManagement from "./pages/PromotionManagement";
+import AdvertisementManagement from "./pages/AdvertisementManagement";
+import NewsManagement from "./pages/NewsManagement";
 
 const queryClient = new QueryClient();
 
@@ -196,6 +198,16 @@ const App = () => (
                 <Route path="/promotions" element={
                   <ProtectedRoute allowedRoles={["ADMIN"]}>
                     <PromotionManagement />
+                  </ProtectedRoute>
+                } />
+                <Route path="/advertisements" element={
+                  <ProtectedRoute allowedRoles={["ADMIN"]}>
+                    <AdvertisementManagement />
+                  </ProtectedRoute>
+                } />
+                <Route path="/news" element={
+                  <ProtectedRoute allowedRoles={["ADMIN"]}>
+                    <NewsManagement />
                   </ProtectedRoute>
                 } />
 

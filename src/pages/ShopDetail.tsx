@@ -807,6 +807,7 @@ const ShopDetail = () => {
                     rrp={Number(product.rrp)}
                     onPriceUpdate={handlePriceUpdate}
                     onOfferUpdate={handleOfferUpdate}
+                    onProductUpdated={refetchProductsAtShop}
                   />
                 ))
               ) : (

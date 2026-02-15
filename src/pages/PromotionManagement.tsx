@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Image, Plus, X, Eye, Package, Store, Calendar, Trash2 } from "lucide-react";
+import { Upload, Image, Plus, X, Eye, Package, Store, Calendar, Trash2, FileText, Images } from "lucide-react";
 import { toast } from "sonner";
 import { API_CONFIG } from "@/config/api";
 
@@ -24,6 +24,8 @@ interface Product {
   barcode?: string;
   img?: string;
   rrp: string;
+  price?: string;
+  offerPrice?: string;
 }
 
 interface Promotion {
@@ -31,6 +33,8 @@ interface Promotion {
   title: string;
   description?: string;
   imageUrl: string;
+  imageUrls?: string[];  // Multiple images for carousel
+  pdfUrl?: string;       // PDF document URL
   shopId: string;
   isActive: boolean;
   createdAt: string;
@@ -54,7 +58,11 @@ const PromotionManagement: React.FC = () => {
     description: '',
     shopId: '',
     imageFile: null as File | null,
-    imagePreview: ''
+    imagePreview: '',
+    imageFiles: [] as File[],      // Multiple images for carousel
+    imagePreviews: [] as string[], // Preview URLs for multiple images
+    pdfFile: null as File | null,  // PDF file
+    pdfName: ''                     // PDF filename for display
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -89,7 +97,11 @@ const PromotionManagement: React.FC = () => {
         description: '',
         shopId: '',
         imageFile: null,
-        imagePreview: ''
+        imagePreview: '',
+        imageFiles: [],
+        imagePreviews: [],
+        pdfFile: null,
+        pdfName: ''
       });
       setProducts([]);
       setSelectedProducts([]);
@@ -242,6 +254,53 @@ const PromotionManagement: React.FC = () => {
     }
   };
 
+  // Handle multiple image uploads for carousel
+  const handleMultipleImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files);
+      setFormData(prev => ({ ...prev, imageFiles: [...prev.imageFiles, ...fileArray] }));
+      
+      // Create preview URLs for all new files
+      fileArray.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setFormData(prev => ({ 
+            ...prev, 
+            imagePreviews: [...prev.imagePreviews, e.target?.result as string] 
+          }));
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  // Remove an image from the carousel
+  const removeCarouselImage = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      imageFiles: prev.imageFiles.filter((_, i) => i !== index),
+      imagePreviews: prev.imagePreviews.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Handle PDF upload
+  const handlePdfUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.type === 'application/pdf') {
+        setFormData(prev => ({ ...prev, pdfFile: file, pdfName: file.name }));
+      } else {
+        toast.error('Please upload a PDF file');
+      }
+    }
+  };
+
+  // Remove PDF
+  const removePdf = () => {
+    setFormData(prev => ({ ...prev, pdfFile: null, pdfName: '' }));
+  };
+
   const addProduct = (product: Product) => {
     if (!selectedProducts.find(p => p.id === product.id)) {
       console.log('➕ Adding product:', {
@@ -259,8 +318,11 @@ const PromotionManagement: React.FC = () => {
   };
 
   const createPromotion = async () => {
-    if (!formData.title || !formData.shopId || !formData.imageFile || selectedProducts.length === 0) {
-      toast.error('Please fill all required fields and select at least one product');
+    // Check for at least one image (either single or multiple)
+    const hasImage = formData.imageFile || formData.imageFiles.length > 0;
+    
+    if (!formData.title || !formData.shopId || !hasImage || selectedProducts.length === 0) {
+      toast.error('Please fill all required fields, add at least one image, and select at least one product');
       return;
     }
 
@@ -270,8 +332,22 @@ const PromotionManagement: React.FC = () => {
       formDataToSend.append('title', formData.title);
       formDataToSend.append('description', formData.description);
       formDataToSend.append('shopId', formData.shopId);
-      formDataToSend.append('image', formData.imageFile);
       formDataToSend.append('productIds', JSON.stringify(selectedProducts.map(p => p.id)));
+      
+      // Add single image if provided (legacy support)
+      if (formData.imageFile) {
+        formDataToSend.append('image', formData.imageFile);
+      }
+      
+      // Add multiple images for carousel
+      formData.imageFiles.forEach((file) => {
+        formDataToSend.append('images', file);
+      });
+      
+      // Add PDF if provided
+      if (formData.pdfFile) {
+        formDataToSend.append('pdf', formData.pdfFile);
+      }
 
       const response = await fetch(`${API_BASE}/promotions`, {
         method: 'POST',
@@ -288,11 +364,13 @@ const PromotionManagement: React.FC = () => {
         loadPromotions();
       } else {
         const error = await response.json();
-        toast.error(`Failed to create promotion: ${error.error}`);
+        console.error('Server error:', error);
+        toast.error(`Failed to create promotion: ${error.error || error.details || 'Unknown error'}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating promotion:', error);
-      toast.error('Network error. Please try again.');
+      console.error('Error details:', error.message);
+      toast.error(`Network error: ${error.message || 'Please check if server is running'}`);
     } finally {
       setCreating(false);
     }
@@ -344,7 +422,11 @@ const PromotionManagement: React.FC = () => {
       description: '',
       shopId: '',
       imageFile: null,
-      imagePreview: ''
+      imagePreview: '',
+      imageFiles: [],
+      imagePreviews: [],
+      pdfFile: null,
+      pdfName: ''
     });
     setSelectedProducts([]);
   };
@@ -437,7 +519,7 @@ const PromotionManagement: React.FC = () => {
 
               {/* Image Upload */}
               <div>
-                <label className="text-sm font-medium mb-2 block">Promotion Image *</label>
+                <label className="text-sm font-medium mb-2 block">Primary Promotion Image *</label>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
                   {formData.imagePreview ? (
                     <div className="relative">
@@ -466,6 +548,87 @@ const PromotionManagement: React.FC = () => {
                         type="file"
                         accept="image/*"
                         onChange={handleImageUpload}
+                        className="max-w-xs mx-auto"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Multiple Images Upload (Carousel) */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  <Images className="inline mr-2" size={16} />
+                  Additional Images (Carousel) - Optional
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  {formData.imagePreviews.length > 0 && (
+                    <div className="grid grid-cols-4 gap-3 mb-4">
+                      {formData.imagePreviews.map((preview, index) => (
+                        <div key={index} className="relative">
+                          <img 
+                            src={preview} 
+                            alt={`Preview ${index + 1}`} 
+                            className="w-full h-24 object-cover rounded"
+                          />
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                            onClick={() => removeCarouselImage(index)}
+                          >
+                            <X size={12} />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Add multiple images for a slideshow carousel (up to 10 images)
+                    </p>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleMultipleImagesUpload}
+                      className="max-w-xs mx-auto"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* PDF Upload */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  <FileText className="inline mr-2" size={16} />
+                  PDF Document - Optional
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  {formData.pdfFile ? (
+                    <div className="flex items-center justify-between bg-gray-100 p-3 rounded">
+                      <div className="flex items-center gap-2">
+                        <FileText size={24} className="text-red-500" />
+                        <span className="text-sm font-medium">{formData.pdfName}</span>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={removePdf}
+                      >
+                        <X size={16} />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <FileText className="mx-auto mb-2 text-muted-foreground" size={32} />
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Upload a PDF document (up to 20MB)
+                      </p>
+                      <Input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        onChange={handlePdfUpload}
                         className="max-w-xs mx-auto"
                       />
                     </div>
@@ -616,11 +779,47 @@ const PromotionManagement: React.FC = () => {
               <CardContent>
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
+                    {/* Primary Image */}
                     <img 
                       src={promotion.imageUrl} 
                       alt={promotion.title}
                       className="w-full h-48 object-cover rounded-lg"
                     />
+                    
+                    {/* Carousel Images */}
+                    {promotion.imageUrls && promotion.imageUrls.length > 0 && (
+                      <div className="mt-3">
+                        <h5 className="text-sm font-medium mb-2 flex items-center gap-2">
+                          <Images size={14} />
+                          Additional Images ({promotion.imageUrls.length})
+                        </h5>
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                          {promotion.imageUrls.map((url: string, idx: number) => (
+                            <img 
+                              key={idx}
+                              src={url} 
+                              alt={`${promotion.title} ${idx + 1}`}
+                              className="w-16 h-16 object-cover rounded flex-shrink-0"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* PDF Document */}
+                    {promotion.pdfUrl && (
+                      <div className="mt-3">
+                        <a 
+                          href={promotion.pdfUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                        >
+                          <FileText size={16} />
+                          <span className="text-sm font-medium">View PDF Document</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
                   
                   <div>

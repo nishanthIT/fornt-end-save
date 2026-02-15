@@ -1,6 +1,6 @@
 
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 const useFetchProducts = (searchQuery, filters = {}, page = 1, limit = 10) => {
   const [products, setProducts] = useState([]);
@@ -12,11 +12,17 @@ const useFetchProducts = (searchQuery, filters = {}, page = 1, limit = 10) => {
     limit: 10,
     totalPages: 0
   });
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
   
   // Use ref to track if component is mounted
   const isMountedRef = useRef(true);
   // Use ref to track the latest request
   const latestRequestRef = useRef(0);
+
+  // Refetch function to manually trigger a refresh
+  const refetch = useCallback(() => {
+    setRefetchTrigger(prev => prev + 1);
+  }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -122,9 +128,9 @@ const useFetchProducts = (searchQuery, filters = {}, page = 1, limit = 10) => {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, JSON.stringify(filters), page, limit]);
+  }, [searchQuery, JSON.stringify(filters), page, limit, refetchTrigger]);
 
-  return { products, loading, error, pagination };
+  return { products, loading, error, pagination, refetch };
 };
 
 export default useFetchProducts;

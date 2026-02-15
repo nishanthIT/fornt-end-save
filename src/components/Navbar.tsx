@@ -105,7 +105,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Grid, Box, Users, Store, Menu, UserCircle, LogOut, AlertTriangle, Image } from "lucide-react";
+import { Grid, Box, Users, Store, Menu, UserCircle, LogOut, AlertTriangle, Image, Newspaper, MonitorPlay } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const Navbar = () => {
@@ -121,6 +121,8 @@ export const Navbar = () => {
     { icon: UserCircle, label: "Employees", path: "/employees" },
     { icon: AlertTriangle, label: "Price Corrections", path: "/price-corrections" },
     { icon: Image, label: "Promotions", path: "/promotions" },
+    { icon: MonitorPlay, label: "Advertisements", path: "/advertisements" },
+    { icon: Newspaper, label: "News", path: "/news" },
   ];
 
   const employeeNavItems = [
@@ -138,15 +140,15 @@ export const Navbar = () => {
   };
 
   const NavContent = () => (
-    <div className="flex flex-col space-y-3 md:flex-row md:space-y-0 md:gap-6">
+    <div className="flex flex-col space-y-3 md:flex-row md:space-y-0 md:gap-2 md:flex-wrap">
       {navItems.map((item) => (
         <Link
           key={item.label}
           to={item.path}
-          className="flex items-center gap-3 px-3 py-2 text-sm font-medium navbar-responsive-text hover:bg-gray-100 rounded-md transition-colors duration-200 dark:hover:bg-gray-800 lg:hover:bg-gray-100 lg:hover:bg-opacity-20"
+          className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium navbar-responsive-text hover:bg-gray-100 rounded-md transition-colors duration-200 dark:hover:bg-gray-800 lg:hover:bg-gray-100 lg:hover:bg-opacity-20 whitespace-nowrap"
           onClick={() => setOpen(false)}
         >
-          <item.icon className="h-5 w-5" />
+          <item.icon className="h-4 w-4" />
           <span className="md:inline">{item.label}</span>
         </Link>
       ))}
@@ -176,7 +178,7 @@ export const Navbar = () => {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex lg:items-center lg:space-x-1">
+          <div className="hidden lg:flex lg:items-center lg:flex-1 lg:justify-center lg:px-4 overflow-x-auto">
             <NavContent />
           </div>
 
