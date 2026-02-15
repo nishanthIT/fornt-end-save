@@ -93,6 +93,68 @@ const ShopDetail = () => {
     const formatted = formatPriceInput(cleanValue);
     setter(formatted);
   };
+
+  // Image compression function for camera captures
+  const compressImage = (file: File, maxWidth = 1200, maxHeight = 1200, quality = 0.8): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+      
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions
+        let { width, height } = img;
+        
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            if (width > maxWidth) {
+              height = (height * maxWidth) / width;
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = (width * maxHeight) / height;
+              height = maxHeight;
+            }
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw and compress
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              console.log(`Compressed image from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      
+      img.onerror = () => {
+        resolve(file); // Return original file if compression fails
+      };
+      
+      img.src = URL.createObjectURL(file);
+    });
+  };
   
   // Use the custom hooks to fetch products
   const { products: fetchedProducts, loading, error } = useFetchProducts(searchQuery);
@@ -850,11 +912,22 @@ const ShopDetail = () => {
                 <Input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => {
+                  capture="environment"
+                  onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      setAddProductImageFile(file);
-                      setAddProductImage(URL.createObjectURL(file));
+                      try {
+                        // Compress image if it's larger than 1MB
+                        const compressedFile = file.size > 1024 * 1024 
+                          ? await compressImage(file) 
+                          : file;
+                        setAddProductImageFile(compressedFile);
+                        setAddProductImage(URL.createObjectURL(compressedFile));
+                      } catch (error) {
+                        console.error('Error compressing image:', error);
+                        setAddProductImageFile(file);
+                        setAddProductImage(URL.createObjectURL(file));
+                      }
                     }
                   }}
                   className="flex-1"
