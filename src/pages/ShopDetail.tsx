@@ -251,7 +251,14 @@ const ShopDetail = () => {
 
   // Function to confirm adding new product
   const confirmAddNewProduct = () => {
-    setTitle(notFoundProductName);
+    // Check if notFoundProductName looks like a barcode (all digits)
+    const isBarcode = /^\d+$/.test(notFoundProductName);
+    if (isBarcode) {
+      setBarcode(notFoundProductName);
+      setTitle(""); // Don't set barcode as title
+    } else {
+      setTitle(notFoundProductName);
+    }
     setShowProductNotFoundDialog(false);
     // Trigger the add product dialog
     (document.querySelector('[data-trigger="add-new-product"]') as HTMLElement)?.click();
