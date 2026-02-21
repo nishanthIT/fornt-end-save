@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Store, Phone, MapPin, Plus, Save, PlusCircle, Barcode, Search, Camera, Upload } from "lucide-react";
+import { Store, Phone, MapPin, Plus, Save, PlusCircle, Barcode, Search, Camera, Upload, X } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductCardshop } from "@/components/ProductCardShop";
 import { ProductAtShopCard } from "@/components/ProductAtShopCard";
@@ -715,12 +715,24 @@ const ShopDetail = () => {
           <div className="mb-4 sm:mb-8 space-y-3">
             {/* Search Input with Scan Button */}
             <div className="flex gap-2">
-              <Input
-                placeholder="Search by name or barcode..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1"
-              />
+              <div className="relative flex-1">
+                <Input
+                  placeholder="Search by name or barcode..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pr-8"
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                    onClick={() => setSearchQuery("")}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
               <Button 
                 variant="outline" 
                 onClick={() => setShowSearchScanner(!showSearchScanner)}
@@ -830,12 +842,24 @@ const ShopDetail = () => {
         <>
           <div className="mb-3 sm:mb-4">
             <div className="flex gap-2">
-              <Input
-                placeholder="Search for a product..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1"
-              />
+              <div className="relative flex-1">
+                <Input
+                  placeholder="Search for a product..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pr-8"
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                    onClick={() => setSearchQuery("")}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
               <Button 
                 variant="outline" 
                 size="icon"
@@ -910,7 +934,15 @@ const ShopDetail = () => {
       )}
 
       {/* Dialog for adding existing product with details */}
-      <Dialog open={showAddProductDialog} onOpenChange={setShowAddProductDialog}>
+      <Dialog open={showAddProductDialog} onOpenChange={(open) => {
+          setShowAddProductDialog(open);
+          if (!open) {
+            // Clear image states when dialog closes
+            if (addProductImage) URL.revokeObjectURL(addProductImage);
+            setAddProductImage(null);
+            setAddProductImageFile(null);
+          }
+        }}>
         <DialogContent className="max-h-[80vh] w-full md:w-[400px] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Product to Shop</DialogTitle>
