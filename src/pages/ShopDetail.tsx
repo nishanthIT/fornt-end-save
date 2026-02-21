@@ -628,12 +628,29 @@ const ShopDetail = () => {
                   </div>
 
                   {/* Category */}
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     <label className="text-sm text-muted-foreground">Category</label>
+                    {/* Quick select scrollable chips */}
+                    <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin scrollbar-thumb-gray-300">
+                      {["Confectionery", "Crisps", "Soft Drinks", "Alcohol", "Grocery", "Pet Food", "Health & Beauty", "House Hold", "Hardware", "Medicines", "Cigarettes", "Single Spirits", "Cakes & Bread", "Chill Foods", "Frozen & Ice Cream"].map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setCategory(cat)}
+                          className={`px-3 py-1 text-xs rounded-full whitespace-nowrap flex-shrink-0 transition-colors ${
+                            category === cat
+                              ? "bg-blue-500 text-white"
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
                     <CategorySelect
                       value={category}
                       onChange={setCategory}
-                      placeholder="Select category..."
+                      placeholder="Or search category..."
                     />
                   </div>
 
@@ -649,8 +666,19 @@ const ShopDetail = () => {
                       />
                     </div>
                     {image && (
-                      <div className="mt-2">
+                      <div className="mt-2 relative inline-block">
                         <img src={image} alt="Preview" className="w-20 h-20 object-cover rounded-md" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImage(null);
+                            setImageFile(null);
+                            setImageName("");
+                          }}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                         <p className="text-xs text-muted-foreground mt-1">{imageName}</p>
                       </div>
                     )}
@@ -1101,10 +1129,27 @@ const ShopDetail = () => {
             
             <div className="space-y-2">
               <label className="block font-semibold">Category</label>
+              {/* Quick select scrollable chips */}
+              <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin scrollbar-thumb-gray-300">
+                {["Confectionery", "Crisps", "Soft Drinks", "Alcohol", "Grocery", "Pet Food", "Health & Beauty", "House Hold", "Hardware", "Medicines", "Cigarettes", "Single Spirits", "Cakes & Bread", "Chill Foods", "Frozen & Ice Cream"].map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setAddProductCategory(cat)}
+                    className={`px-3 py-1 text-xs rounded-full whitespace-nowrap flex-shrink-0 transition-colors ${
+                      addProductCategory === cat
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
               <CategorySelect
                 value={addProductCategory}
                 onChange={setAddProductCategory}
-                placeholder="Select category..."
+                placeholder="Or search category..."
               />
             </div>
             {/* Add Product Button */}
