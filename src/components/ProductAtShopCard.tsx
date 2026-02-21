@@ -288,31 +288,42 @@ export const ProductAtShopCard = ({
     }
   };
 
-  // Handle editing the product itself
+  // Handle editing the product itself - runs in background
   const handleEditProductSave = async () => {
     if (!editProductTitle.trim()) {
       toast.error("Title is required");
       return;
     }
 
-    setIsEditingProduct(true);
+    // Close dialog immediately and show uploading toast
+    setShowEditProductDialog(false);
+    
+    // Show uploading indicator toast
+    const hasImage = !!selectedImage;
+    const uploadingToast = toast.loading(hasImage ? "Uploading product image..." : "Saving product...");
+    
+    // Capture form data before resetting
+    const formDataToSend = new FormData();
+    formDataToSend.append("title", editProductTitle);
+    formDataToSend.append("caseSize", editProductCaseSize);
+    formDataToSend.append("packetSize", editProductPacketSize);
+    formDataToSend.append("retailSize", editProductRetailSize);
+    formDataToSend.append("rrp", String(parseFloat(editProductRrp) || 0));
+    formDataToSend.append("barcode", editProductBarcode);
+    formDataToSend.append("caseBarcode", editProductCaseBarcode || "");
+    formDataToSend.append("category", editProductCategory || "");
+    
+    if (selectedImage) {
+      formDataToSend.append("image", selectedImage);
+    }
+    
+    // Reset image state
+    setSelectedImage(null);
+    setImagePreview(null);
+    
+    // Run upload in background
     try {
       const authToken = localStorage.getItem("auth_token");
-      
-      // Use FormData to support file upload
-      const formData = new FormData();
-      formData.append("title", editProductTitle);
-      formData.append("caseSize", editProductCaseSize);
-      formData.append("packetSize", editProductPacketSize);
-      formData.append("retailSize", editProductRetailSize);
-      formData.append("rrp", String(parseFloat(editProductRrp) || 0));
-      formData.append("barcode", editProductBarcode);
-      formData.append("caseBarcode", editProductCaseBarcode || "");
-      formData.append("category", editProductCategory || "");
-      
-      if (selectedImage) {
-        formData.append("image", selectedImage);
-      }
 
       const response = await fetch(
         `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/editProduct/${productId}`,
@@ -321,28 +332,26 @@ export const ProductAtShopCard = ({
           headers: {
             ...(authToken && { Authorization: `Bearer ${authToken}` }),
           },
-          body: formData,
+          body: formDataToSend,
         }
       );
 
       if (response.ok) {
-        toast.success("Product updated successfully");
-        setShowEditProductDialog(false);
-        setSelectedImage(null);
-        setImagePreview(null);
+        toast.dismiss(uploadingToast);
+        toast.success("Product updated successfully!");
         // Refresh data without page reload
         if (onProductUpdated) {
           onProductUpdated();
         }
       } else {
         const error = await response.json();
+        toast.dismiss(uploadingToast);
         toast.error(error.error || "Failed to update product");
       }
     } catch (error) {
       console.error("Error updating product:", error);
+      toast.dismiss(uploadingToast);
       toast.error("Error updating product");
-    } finally {
-      setIsEditingProduct(false);
     }
   };
 
@@ -373,7 +382,6 @@ export const ProductAtShopCard = ({
             <div className="flex flex-wrap gap-x-1.5 gap-y-0 mt-0.5 text-[10px] sm:text-xs text-gray-600">
               <span>Case:{caseSize}</span>
               <span>Pkt:{packetSize}</span>
-              <span>Rtl:{retailSize}</span>
               {aiel && <span>Aisle:{aiel}</span>}
             </div>
             {/* Barcodes inline */}
@@ -556,14 +564,7 @@ export const ProductAtShopCard = ({
                 />
               </div>
             </div>
-            <div>
-              <label className="text-sm font-medium">Retail Size</label>
-              <Input
-                value={editProductRetailSize}
-                onChange={(e) => setEditProductRetailSize(e.target.value)}
-                placeholder="e.g. 500ml"
-              />
-            </div>
+            {/* Retail Size hidden per client request */}
             <div>
               <label className="text-sm font-medium">RRP (e.g. 456 = £4.56)</label>
               <Input

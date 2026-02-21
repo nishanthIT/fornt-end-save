@@ -314,6 +314,10 @@ const ProductDetail = () => {
     
     // Start loading bar
     setUploadProgress(true);
+    
+    // Show uploading toast for long operations
+    const hasImage = !!selectedImage;
+    const uploadingToast = hasImage ? sonnerToast.loading("Uploading product image...") : null;
 
     // Submit in background
     try {
@@ -353,10 +357,16 @@ const ProductDetail = () => {
         ...product,
         ...updatedData.data,
       });
+      
+      // Clear image state
+      setSelectedImage(null);
+      setImagePreview(null);
 
-      sonnerToast.success("Product updated successfully");
+      if (uploadingToast) sonnerToast.dismiss(uploadingToast);
+      sonnerToast.success("Product updated successfully!");
     } catch (error) {
       console.error("Error updating product:", error);
+      if (uploadingToast) sonnerToast.dismiss(uploadingToast);
       sonnerToast.error(error.message || "Failed to update product");
     } finally {
       setUploadProgress(false);
@@ -569,20 +579,8 @@ const ProductDetail = () => {
                               <FormMessage />
                             </FormItem>
                           )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="retailSize"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Retail Size *</FormLabel>
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        />    
+                        {/* Retail Size hidden per client request */}
                       </div>
 
                       {/* Image Upload Section */}
@@ -731,10 +729,7 @@ const ProductDetail = () => {
                   <p className="text-sm text-muted-foreground">Barcode</p>
                   <p className="font-medium">{product.barcode}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Retail Size</p>
-                  <p className="font-medium">{product.retailSize}</p>
-                </div>
+                {/* Retail Size hidden per client request */}
                 <div>
                   <p className="text-sm text-muted-foreground">Case Size</p>
                   <p className="font-medium">{product.caseSize}</p>

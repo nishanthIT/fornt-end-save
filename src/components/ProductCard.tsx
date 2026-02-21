@@ -212,7 +212,7 @@ export const ProductCard = ({
               <h3 className="text-lg font-medium truncate">{title}</h3>
               <p className="text-sm text-gray-600 truncate">{packetSize}</p>
               <p className="text-sm text-gray-600 truncate">
-                Retail Size: {retailSize} | Case Size: {caseSize}
+                Case Size: {caseSize}
               </p>
               <div className="flex flex-wrap gap-2 mt-1">
                 <Badge variant="secondary" className="text-xs">
@@ -293,14 +293,7 @@ export const ProductCard = ({
                   onChange={(e) => setEditForm(prev => ({ ...prev, packetSize: e.target.value }))}
                 />
               </div>
-              <div>
-                <label className="text-xs text-gray-600 mb-1 block">Retail Size</label>
-                <Input
-                  placeholder="1"
-                  value={editForm.retailSize}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, retailSize: e.target.value }))}
-                />
-              </div>
+              {/* Retail Size hidden per client request */}
               <div>
                 <label className="text-xs text-gray-600 mb-1 block">RRP (e.g. 456 = £4.56)</label>
                 <div className="relative">

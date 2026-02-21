@@ -447,14 +447,7 @@ const Products = () => {
                       onChange={(e) => setPacketSize(e.target.value)}
                     />
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-600 mb-1 block">Retail Size</label>
-                    <Input
-                      placeholder="1"
-                      value={retailSize}
-                      onChange={(e) => setRetailSize(e.target.value)}
-                    />
-                  </div>
+                  {/* Retail Size hidden per client request */}
                   <div>
                     <label className="text-xs text-gray-600 mb-1 block">RRP (e.g. 456 = £4.56)</label>
                     <div className="relative">

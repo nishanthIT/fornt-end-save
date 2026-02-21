@@ -1,5 +1,6 @@
 // Utility function to construct proper image URLs
-export const getImageUrl = (imagePath: string | string[] | { url?: string } | null | undefined): string => {
+// Optional timestamp parameter for cache busting when images are updated
+export const getImageUrl = (imagePath: string | string[] | { url?: string } | null | undefined, cacheBust?: number): string => {
   if (!imagePath) {
     return "https://www.pngfind.com/pngs/m/131-1312918_png-file-svg-product-icon-transparent-png.png";
   }
@@ -8,7 +9,7 @@ export const getImageUrl = (imagePath: string | string[] | { url?: string } | nu
   if (typeof imagePath === 'object' && !Array.isArray(imagePath)) {
     const imgObj = imagePath as { url?: string };
     if (imgObj.url) {
-      return getImageUrl(imgObj.url);
+      return getImageUrl(imgObj.url, cacheBust);
     }
     return "https://www.pngfind.com/pngs/m/131-1312918_png-file-svg-product-icon-transparent-png.png";
   }
@@ -21,9 +22,12 @@ export const getImageUrl = (imagePath: string | string[] | { url?: string } | nu
     return "https://www.pngfind.com/pngs/m/131-1312918_png-file-svg-product-icon-transparent-png.png";
   }
   
+  // Helper to add cache bust query param
+  const addCacheBust = (url: string) => cacheBust ? `${url}?t=${cacheBust}` : url;
+  
   // If it's already a full URL, return as is
   if (path.startsWith('http://') || path.startsWith('https://')) {
-    return path;
+    return addCacheBust(path);
   }
   
   // If it's a relative path starting with /, construct the full URL
@@ -35,14 +39,14 @@ export const getImageUrl = (imagePath: string | string[] | { url?: string } | nu
     if (path.startsWith('/images/')) {
       // Convert /images/filename to /api/image/filename
       const filename = path.replace('/images/', '').replace('.png', '').replace('.jpg', '').replace('.jpeg', '');
-      return `${baseUrl.replace('/api', '')}/api/image/${filename}`;
+      return addCacheBust(`${baseUrl.replace('/api', '')}/api/image/${filename}`);
     }
     
-    return `${baseUrl.replace('/api', '')}${path}`;
+    return addCacheBust(`${baseUrl.replace('/api', '')}${path}`);
   }
   
   // If it's just a filename/barcode, construct the image URL
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
   const filename = path.replace('.png', '').replace('.jpg', '').replace('.jpeg', '');
-  return `${baseUrl.replace('/api', '')}/api/image/${filename}`;
+  return addCacheBust(`${baseUrl.replace('/api', '')}/api/image/${filename}`);
 };

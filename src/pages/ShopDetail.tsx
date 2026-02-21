@@ -197,25 +197,44 @@ const ShopDetail = () => {
     const finalPacketSize = packetSize || "1";
     const finalRrp = rrp || price; // Default RRP to price if not provided
 
+    // Show uploading toast for long operations (especially with image)
+    const hasImage = !!imageFile;
+    const uploadingToast = toast.loading(hasImage ? "Adding product with image..." : "Adding product...");
+    
+    // Capture all form data before resetting
+    const formData = new FormData();
+    formData.append('shopId', shopId);
+    formData.append('title', title);
+    formData.append('employeeId', String(employeeId));
+    formData.append('caseSize', finalCaseSize);
+    formData.append('packetSize', finalPacketSize);
+    if (retailSize) formData.append('retailSize', retailSize);
+    if (barcode) formData.append('barcode', barcode);
+    if (caseBarcode) formData.append('casebarcode', caseBarcode);
+    if (price) formData.append('price', String(parseFloat(price) || 0));
+    if (Aiel) formData.append('aiel', Aiel);
+    if (finalRrp) formData.append('rrp', String(parseFloat(finalRrp) || 0));
+    if (category) formData.append('category', category);
+    if (imageFile) formData.append('image', imageFile);
+    
+    // Reset form immediately so user can continue
+    setTitle("");
+    setCaseSize("1");
+    setPacketSize("1");
+    setRetailSize("");
+    setPrice("");
+    setAiel("");
+    setRrp("");
+    setCategory("");
+    setCaseBarcode("");
+    setBarcode("");
+    setImage(null);
+    setImageFile(null);
+    setImageName("");
+
+    // Run upload in background
     try {
-      setIsSubmitting(true);
       const authToken = localStorage.getItem("auth_token");
-      
-      // Use FormData to support image upload
-      const formData = new FormData();
-      formData.append('shopId', shopId);
-      formData.append('title', title);
-      formData.append('employeeId', String(employeeId));
-      formData.append('caseSize', finalCaseSize);
-      formData.append('packetSize', finalPacketSize);
-      if (retailSize) formData.append('retailSize', retailSize);
-      if (barcode) formData.append('barcode', barcode);
-      if (caseBarcode) formData.append('casebarcode', caseBarcode);
-      if (price) formData.append('price', String(parseFloat(price) || 0));
-      if (Aiel) formData.append('aiel', Aiel);
-      if (finalRrp) formData.append('rrp', String(parseFloat(finalRrp) || 0));
-      if (category) formData.append('category', category);
-      if (imageFile) formData.append('image', imageFile);
 
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addProductAtShop`, {
         method: "POST",
@@ -229,33 +248,21 @@ const ShopDetail = () => {
       const result = await response.json();
       
       if (response.ok) {
-        setTitle("");
-        setCaseSize("1");
-        setPacketSize("1");
-        setRetailSize("");
-        setPrice("");
-        setAiel("");
-        setRrp("");
-        setCategory("");
-        setCaseBarcode("");
-        setBarcode("");
-        setImage(null);
-        setImageFile(null);
-        setImageName("");
-        toast.success("Product added successfully");
+        toast.dismiss(uploadingToast);
+        toast.success("Product added successfully!");
         
         // Trigger a refresh of products
         setRefreshTrigger(prev => prev + 1);
         await refetchProductsAtShop();
       } else {
+        toast.dismiss(uploadingToast);
         toast.warning(`Error: ${result.error}`);
       }
     } catch (error: any) {
       console.error("Product add error:", error);
       const errorMsg = error?.message || "Unknown error";
+      toast.dismiss(uploadingToast);
       toast.warning(`Error: ${errorMsg}`);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -357,28 +364,47 @@ const ShopDetail = () => {
     
     console.log("Adding product:", { shopId, productId: selectedProduct.id, employeeId });
     
+    // Close dialog immediately
+    setShowAddProductDialog(false);
+    
+    // Show uploading toast for long operations
+    const hasImage = !!addProductImageFile;
+    const uploadingToast = toast.loading(hasImage ? "Adding product with image..." : "Adding product to shop...");
+    
+    // Capture all values before resetting
+    const capturedSelectedProduct = selectedProduct;
+    const capturedAddProductImageFile = addProductImageFile;
+    const capturedAddProductCaseBarcode = addProductCaseBarcode;
+    const capturedAddProductPrice = addProductPrice;
+    const capturedAddProductAiel = addProductAiel;
+    const capturedAddProductpacketSize = addProductpacketSize;
+    const capturedAddProductcaseSize = addProductcaseSize;
+    const capturedAddProductCategory = addProductCategory;
+    const capturedAddProductRrp = addProductRrp;
+    const finalRrp = capturedAddProductRrp || capturedAddProductPrice;
+    
+    // Reset image state
+    if (addProductImage) URL.revokeObjectURL(addProductImage);
+    setAddProductImage(null);
+    setAddProductImageFile(null);
+    
     try {
-      setIsSubmitting(true);
-      
-      // Set default values if empty
-      const finalRrp = addProductRrp || addProductPrice;
-      
       const authToken = localStorage.getItem("auth_token");
       
       // If we have an image file, use FormData
-      if (addProductImageFile) {
+      if (capturedAddProductImageFile) {
         const formData = new FormData();
         formData.append('shopId', shopId);
-        formData.append('id', selectedProduct.id);
+        formData.append('id', capturedSelectedProduct.id);
         if (employeeId) formData.append('employeeId', String(employeeId));
-        if (addProductCaseBarcode) formData.append('casebarcode', addProductCaseBarcode);
-        if (addProductPrice) formData.append('price', String(parseFloat(addProductPrice) || 0));
-        if (addProductAiel) formData.append('aiel', addProductAiel);
+        if (capturedAddProductCaseBarcode) formData.append('casebarcode', capturedAddProductCaseBarcode);
+        if (capturedAddProductPrice) formData.append('price', String(parseFloat(capturedAddProductPrice) || 0));
+        if (capturedAddProductAiel) formData.append('aiel', capturedAddProductAiel);
         if (finalRrp) formData.append('rrp', String(parseFloat(finalRrp) || 0));
-        if (addProductpacketSize) formData.append('packetSize', addProductpacketSize);
-        if (addProductcaseSize) formData.append('caseSize', addProductcaseSize);
-        if (addProductCategory) formData.append('category', addProductCategory);
-        formData.append('image', addProductImageFile);
+        if (capturedAddProductpacketSize) formData.append('packetSize', capturedAddProductpacketSize);
+        if (capturedAddProductcaseSize) formData.append('caseSize', capturedAddProductcaseSize);
+        if (capturedAddProductCategory) formData.append('category', capturedAddProductCategory);
+        formData.append('image', capturedAddProductImageFile);
         
         const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addProductAtShopifExistAtProduct`, {
           method: "POST",
@@ -392,28 +418,27 @@ const ShopDetail = () => {
         const result = await response.json();
 
         if (response.ok) {
-          toast.success("Product added to shop successfully");
-          setShowAddProductDialog(false);
-          setAddProductImage(null);
-          setAddProductImageFile(null);
+          toast.dismiss(uploadingToast);
+          toast.success("Product added to shop successfully!");
           setRefreshTrigger(prev => prev + 1);
           await refetchProductsAtShop();
         } else {
+          toast.dismiss(uploadingToast);
           toast.warning(`Error: ${result.error}`);
         }
       } else {
         // No image, use JSON
         const productData = {
           shopId,
-          id: selectedProduct.id,
+          id: capturedSelectedProduct.id,
           ...(employeeId && { employeeId }),
-          ...(addProductCaseBarcode && { casebarcode: addProductCaseBarcode }),
-          ...(addProductPrice && { price: parseFloat(addProductPrice) || 0 }),
-          ...(addProductAiel && { aiel: addProductAiel }),
+          ...(capturedAddProductCaseBarcode && { casebarcode: capturedAddProductCaseBarcode }),
+          ...(capturedAddProductPrice && { price: parseFloat(capturedAddProductPrice) || 0 }),
+          ...(capturedAddProductAiel && { aiel: capturedAddProductAiel }),
           ...(finalRrp && { rrp: parseFloat(finalRrp) || 0 }),
-          ...(addProductpacketSize && { packetSize: addProductpacketSize }),
-          ...(addProductcaseSize && { caseSize: addProductcaseSize }),
-          ...(addProductCategory && { category: addProductCategory })
+          ...(capturedAddProductpacketSize && { packetSize: capturedAddProductpacketSize }),
+          ...(capturedAddProductcaseSize && { caseSize: capturedAddProductcaseSize }),
+          ...(capturedAddProductCategory && { category: capturedAddProductCategory })
         };
         
         console.log("Sending product data:", productData);
@@ -431,19 +456,19 @@ const ShopDetail = () => {
         const result = await response.json();
 
         if (response.ok) {
-          toast.success("Product added to shop successfully");
-          setShowAddProductDialog(false);
+          toast.dismiss(uploadingToast);
+          toast.success("Product added to shop successfully!");
           setRefreshTrigger(prev => prev + 1);
           await refetchProductsAtShop();
         } else {
+          toast.dismiss(uploadingToast);
           toast.warning(`Error: ${result.error}`);
         }
       }
     } catch (error) {
       console.error(error);
+      toast.dismiss(uploadingToast);
       toast.warning("An error occurred. Please try again later.");
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -597,8 +622,7 @@ const ShopDetail = () => {
                     <Input type="text" placeholder="Enter Packet Size" value={packetSize} onChange={(e) => setPacketSize(e.target.value)} />
                   </div>
 
-                  {/* Retail Size */}
-                  <Input type="text" placeholder="Retail Size" value={retailSize} onChange={(e) => setRetailSize(e.target.value)} />
+                  {/* Retail Size hidden per client request */}
 
                   {/* Price */}
                   <div className="relative">
@@ -815,8 +839,6 @@ const ShopDetail = () => {
                             <span>Case: {product.caseSize || "N/A"}</span>
                             <span className="hidden sm:inline">•</span>
                             <span>Packet: {product.packetSize || "N/A"}</span>
-                            <span className="hidden sm:inline">•</span>
-                            <span>Retail: {product.retailSize || "N/A"}</span>
                           </div>
                           {isAlreadyAdded && (
                             <span className="text-xs text-green-600 font-medium">✓ Already added to shop</span>
