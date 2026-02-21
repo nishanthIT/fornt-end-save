@@ -250,9 +250,10 @@ const ShopDetail = () => {
       } else {
         toast.warning(`Error: ${result.error}`);
       }
-    } catch (error) {
-      console.error(error);
-      toast.warning("An error occurred. Please try again later.");
+    } catch (error: any) {
+      console.error("Product add error:", error);
+      const errorMsg = error?.message || "Unknown error";
+      toast.warning(`Error: ${errorMsg}`);
     } finally {
       setIsSubmitting(false);
     }
