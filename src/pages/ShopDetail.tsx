@@ -630,14 +630,14 @@ const ShopDetail = () => {
                   {/* Category */}
                   <div className="space-y-2">
                     <label className="text-sm text-muted-foreground">Category</label>
-                    {/* Quick select scrollable chips */}
-                    <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin scrollbar-thumb-gray-300">
+                    {/* Quick select grid chips - mobile friendly */}
+                    <div className="flex flex-wrap gap-1.5">
                       {["Confectionery", "Crisps", "Soft Drinks", "Alcohol", "Grocery", "Pet Food", "Health & Beauty", "House Hold", "Hardware", "Medicines", "Cigarettes", "Single Spirits", "Cakes & Bread", "Chill Foods", "Frozen & Ice Cream"].map((cat) => (
                         <button
                           key={cat}
                           type="button"
                           onClick={() => setCategory(cat)}
-                          className={`px-3 py-1 text-xs rounded-full whitespace-nowrap flex-shrink-0 transition-colors ${
+                          className={`px-2 py-1 text-[10px] sm:text-xs rounded-full transition-colors ${
                             category === cat
                               ? "bg-blue-500 text-white"
                               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -647,11 +647,6 @@ const ShopDetail = () => {
                         </button>
                       ))}
                     </div>
-                    <CategorySelect
-                      value={category}
-                      onChange={setCategory}
-                      placeholder="Or search category..."
-                    />
                   </div>
 
                   {/* Image Upload */}
@@ -1129,14 +1124,14 @@ const ShopDetail = () => {
             
             <div className="space-y-2">
               <label className="block font-semibold">Category</label>
-              {/* Quick select scrollable chips */}
-              <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin scrollbar-thumb-gray-300">
+              {/* Quick select grid chips - mobile friendly */}
+              <div className="flex flex-wrap gap-1.5">
                 {["Confectionery", "Crisps", "Soft Drinks", "Alcohol", "Grocery", "Pet Food", "Health & Beauty", "House Hold", "Hardware", "Medicines", "Cigarettes", "Single Spirits", "Cakes & Bread", "Chill Foods", "Frozen & Ice Cream"].map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setAddProductCategory(cat)}
-                    className={`px-3 py-1 text-xs rounded-full whitespace-nowrap flex-shrink-0 transition-colors ${
+                    className={`px-2 py-1 text-[10px] sm:text-xs rounded-full transition-colors ${
                       addProductCategory === cat
                         ? "bg-blue-500 text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -1146,11 +1141,6 @@ const ShopDetail = () => {
                   </button>
                 ))}
               </div>
-              <CategorySelect
-                value={addProductCategory}
-                onChange={setAddProductCategory}
-                placeholder="Or search category..."
-              />
             </div>
             {/* Add Product Button */}
             <Button 
