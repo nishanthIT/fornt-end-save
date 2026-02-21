@@ -22,6 +22,7 @@ import useFetchProducts from "@/hooks/useFetchProducts";
 import { OptimizedScanner } from "@/components/OptimizedScanner";
 import { TopLoadingBar } from "@/components/TopLoadingBar";
 import { toast } from "sonner";
+import { CategorySelect } from "@/components/CategorySelect";
 
 const Products = () => {
   // Use search params for persistent filters
@@ -53,6 +54,7 @@ const Products = () => {
   const [packetSize, setPacketSize] = useState<string>("1");
   const [retailSize, setRetailSize] = useState<string>("1");
   const [rrp, setRrp] = useState<string>("");
+  const [category, setCategory] = useState<string>("");
 
   // Helper function to format price input (456 -> 4.56, 45 -> 0.45, 1 -> 0.01)
   const formatPriceInput = (value: string): string => {
@@ -307,6 +309,7 @@ const Products = () => {
     formData.append("retailSize", retailSize);
     formData.append("barcode", addBarcode);
     formData.append("caseBarcode", addCaseBarcode);
+    formData.append("category", category);
     
     if (selectedImage) {
       formData.append("image", selectedImage);
@@ -320,6 +323,7 @@ const Products = () => {
     setPacketSize("1");
     setRetailSize("1");
     setRrp("");
+    setCategory("");
     setSelectedImage(null);
     setImagePreview(null);
     
@@ -463,6 +467,14 @@ const Products = () => {
                         inputMode="numeric"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Category</label>
+                    <CategorySelect
+                      value={category}
+                      onChange={setCategory}
+                      placeholder="Select category..."
+                    />
                   </div>
                 </div>
 

@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { getImageUrl } from "@/utils/imageUtils";
 import { fuzzyFilter } from "@/utils/fuzzySearch";
+import { CategorySelect } from "@/components/CategorySelect";
 
 const ShopDetail = () => {
   const { id } = useParams();
@@ -43,7 +44,9 @@ const ShopDetail = () => {
   const [price, setPrice] = useState("");
   const [Aiel, setAiel] = useState("");
   const [rrp, setRrp] = useState("");
+  const [category, setCategory] = useState("");
   const [image, setImage] = useState(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageName, setImageName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -62,6 +65,7 @@ const ShopDetail = () => {
   const [addProductRrp, setAddProductRrp] = useState("");
   const [addProductcaseSize , setAddProductcaseSize ] = useState("");
   const [addProductpacketSize, setAddProductpacketSize] = useState("");
+  const [addProductCategory, setAddProductCategory] = useState("");
   const [addProductImage, setAddProductImage] = useState<string | null>(null);
   const [addProductImageFile, setAddProductImageFile] = useState<File | null>(null);
   const [showAddProductScanner, setShowAddProductScanner] = useState(false);
@@ -178,6 +182,7 @@ const ShopDetail = () => {
     const file = e.target.files[0];
     if (file) {
       setImage(URL.createObjectURL(file));
+      setImageFile(file);
       setImageName(file.name);
     }
   };
@@ -192,32 +197,33 @@ const ShopDetail = () => {
     const finalPacketSize = packetSize || "1";
     const finalRrp = rrp || price; // Default RRP to price if not provided
 
-    const productData = {
-      shopId,
-      title,
-      employeeId,
-      caseSize: finalCaseSize,
-      packetSize: finalPacketSize,
-      retailSize: retailSize || null,
-      barcode: barcode || null,
-      casebarcode: caseBarcode || null,
-      price: parseFloat(price) || null,
-      aiel: Aiel || null,
-      rrp: parseFloat(finalRrp) || null,
-    };
-
     try {
       setIsSubmitting(true);
       const authToken = localStorage.getItem("auth_token");
+      
+      // Use FormData to support image upload
+      const formData = new FormData();
+      formData.append('shopId', shopId);
+      formData.append('title', title);
+      formData.append('employeeId', String(employeeId));
+      formData.append('caseSize', finalCaseSize);
+      formData.append('packetSize', finalPacketSize);
+      if (retailSize) formData.append('retailSize', retailSize);
+      if (barcode) formData.append('barcode', barcode);
+      if (caseBarcode) formData.append('casebarcode', caseBarcode);
+      if (price) formData.append('price', String(parseFloat(price) || 0));
+      if (Aiel) formData.append('aiel', Aiel);
+      if (finalRrp) formData.append('rrp', String(parseFloat(finalRrp) || 0));
+      if (category) formData.append('category', category);
+      if (imageFile) formData.append('image', imageFile);
+
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addProductAtShop`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          ...(authToken && { Authorization: `Bearer ${authToken
-          }` }),
+          ...(authToken && { Authorization: `Bearer ${authToken}` }),
         },
-        body: JSON.stringify(productData),
-         credentials: 'include'
+        body: formData,
+        credentials: 'include'
       });
       
       const result = await response.json();
@@ -230,8 +236,12 @@ const ShopDetail = () => {
         setPrice("");
         setAiel("");
         setRrp("");
+        setCategory("");
         setCaseBarcode("");
         setBarcode("");
+        setImage(null);
+        setImageFile(null);
+        setImageName("");
         toast.success("Product added successfully");
         
         // Trigger a refresh of products
@@ -300,14 +310,20 @@ const ShopDetail = () => {
     setAddProductRrp(product.rrp || "");
     setAddProductpacketSize(product.packetSize || ""); 
     setAddProductcaseSize(product.caseSize || ""); 
+    setAddProductCategory(product.category || "");
+    // Properly clear image state - revoke old URL to prevent memory leaks
+    if (addProductImage) {
+      URL.revokeObjectURL(addProductImage);
+    }
+    // Clear image states so previous product's photo doesn't show
     setAddProductImage(null);
     setAddProductImageFile(null);
     setShowAddProductDialog(true);
   };
 
-  // Function to handle product not found scenario
-  const handleProductNotFound = (searchTerm) => {
-    setNotFoundProductName(searchTerm);
+  // Function to show product not found dialog
+  const handleProductNotFound = (productName: string) => {
+    setNotFoundProductName(productName);
     setShowProductNotFoundDialog(true);
   };
 
@@ -360,6 +376,7 @@ const ShopDetail = () => {
         if (finalRrp) formData.append('rrp', String(parseFloat(finalRrp) || 0));
         if (addProductpacketSize) formData.append('packetSize', addProductpacketSize);
         if (addProductcaseSize) formData.append('caseSize', addProductcaseSize);
+        if (addProductCategory) formData.append('category', addProductCategory);
         formData.append('image', addProductImageFile);
         
         const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addProductAtShopifExistAtProduct`, {
@@ -394,7 +411,8 @@ const ShopDetail = () => {
           ...(addProductAiel && { aiel: addProductAiel }),
           ...(finalRrp && { rrp: parseFloat(finalRrp) || 0 }),
           ...(addProductpacketSize && { packetSize: addProductpacketSize }),
-          ...(addProductcaseSize && { caseSize: addProductcaseSize })
+          ...(addProductcaseSize && { caseSize: addProductcaseSize }),
+          ...(addProductCategory && { category: addProductCategory })
         };
         
         console.log("Sending product data:", productData);
@@ -605,6 +623,16 @@ const ShopDetail = () => {
                       value={rrp} 
                       onChange={(e) => handlePriceChange(e.target.value, setRrp)}
                       className="pl-7"
+                    />
+                  </div>
+
+                  {/* Category */}
+                  <div className="space-y-1">
+                    <label className="text-sm text-muted-foreground">Category</label>
+                    <CategorySelect
+                      value={category}
+                      onChange={setCategory}
+                      placeholder="Select category..."
                     />
                   </div>
 
@@ -862,6 +890,7 @@ const ShopDetail = () => {
                     barcode={product.barcode}
                     caseBarcode={product.caseBarcode}
                     img={product.img}
+                    category={product.category || ""}
                     price={Number(product.price)}
                     offerPrice={product.offerPrice ? Number(product.offerPrice) : undefined}
                     offerExpiryDate={product.offerExpiryDate}
@@ -1034,6 +1063,15 @@ const ShopDetail = () => {
                 placeholder="e.g. 1, 500ml, 1kg"
                 value={addProductpacketSize}
                 onChange={(e) => setAddProductpacketSize(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="block font-semibold">Category</label>
+              <CategorySelect
+                value={addProductCategory}
+                onChange={setAddProductCategory}
+                placeholder="Select category..."
               />
             </div>
             {/* Add Product Button */}

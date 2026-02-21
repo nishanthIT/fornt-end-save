@@ -34,6 +34,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { getImageUrl } from "@/utils/imageUtils";
 import { useAuth } from "@/contexts/AuthContext";
+import { CategorySelect } from "@/components/CategorySelect";
 
 // Form validation schema
 const productSchema = z.object({
@@ -44,6 +45,7 @@ const productSchema = z.object({
   packetSize: z.string().optional(),
   rrp: z.string().optional(),
   caseBarcode: z.string().optional(),
+  category: z.string().optional(),
 });
 
 const ProductDetail = () => {
@@ -133,7 +135,8 @@ const ProductDetail = () => {
       caseSize: product?.caseSize || "",
       packetSize: product?.packetSize || "",
       rrp: product?.rrp || "",
-      caseBarcode: product?.caseBarcode || ""
+      caseBarcode: product?.caseBarcode || "",
+      category: product?.category || ""
     },
   });
 
@@ -147,7 +150,8 @@ const ProductDetail = () => {
         caseSize: product.caseSize || "",
         packetSize: product.packetSize || "",
         rrp: product.rrp || "",
-        caseBarcode: product.caseBarcode || ""
+        caseBarcode: product.caseBarcode || "",
+        category: product.category || ""
       });
     }
   }, [product, form]);
@@ -321,6 +325,7 @@ const ProductDetail = () => {
       formData.append("packetSize", values.packetSize || "");
       formData.append("rrp", values.rrp || "");
       formData.append("caseBarcode", values.caseBarcode || "");
+      formData.append("category", values.category || "");
 
       if (selectedImage) {
         formData.append("image", selectedImage);
@@ -515,6 +520,23 @@ const ProductDetail = () => {
                               <FormLabel>RRP</FormLabel>
                               <FormControl>
                                 <Input {...field} type="number" step="0.01" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="category"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Category</FormLabel>
+                              <FormControl>
+                                <CategorySelect
+                                  value={field.value || ""}
+                                  onChange={field.onChange}
+                                  placeholder="Select category..."
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

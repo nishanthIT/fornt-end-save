@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Calendar, Tag, Clock, PoundSterling, Pencil, Upload, X } from "lucide-react";
 import { getImageUrl } from "@/utils/imageUtils";
 import { toast } from "sonner";
+import { CategorySelect } from "@/components/CategorySelect";
 
 interface ProductAtShopCardProps {
   productId: string;
@@ -18,6 +19,7 @@ interface ProductAtShopCardProps {
   barcode: string;
   caseBarcode: string | null;
   img: string[] | { url?: string } | null;
+  category?: string;
   price: number;
   offerPrice?: number;
   offerExpiryDate?: string;
@@ -78,6 +80,7 @@ export const ProductAtShopCard = ({
   barcode,
   caseBarcode,
   img,
+  category,
   price,
   offerPrice,
   offerExpiryDate,
@@ -103,6 +106,7 @@ export const ProductAtShopCard = ({
   const [editProductRrp, setEditProductRrp] = useState(rrp.toString());
   const [editProductBarcode, setEditProductBarcode] = useState(barcode);
   const [editProductCaseBarcode, setEditProductCaseBarcode] = useState(caseBarcode || "");
+  const [editProductCategory, setEditProductCategory] = useState(category || "");
   const [isEditingProduct, setIsEditingProduct] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -304,6 +308,7 @@ export const ProductAtShopCard = ({
       formData.append("rrp", String(parseFloat(editProductRrp) || 0));
       formData.append("barcode", editProductBarcode);
       formData.append("caseBarcode", editProductCaseBarcode || "");
+      formData.append("category", editProductCategory || "");
       
       if (selectedImage) {
         formData.append("image", selectedImage);
@@ -591,6 +596,16 @@ export const ProductAtShopCard = ({
                   placeholder="Case barcode"
                 />
               </div>
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="text-sm font-medium">Category</label>
+              <CategorySelect
+                value={editProductCategory}
+                onChange={setEditProductCategory}
+                placeholder="Select category..."
+              />
             </div>
 
             {/* Current Image */}
