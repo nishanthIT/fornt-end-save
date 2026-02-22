@@ -357,67 +357,72 @@ if(loading) {
 
       {/* Activity Dialog */}
       <Dialog open={selectedEmployee !== null} onOpenChange={(open) => !open && setSelectedEmployee(null)}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="max-w-3xl w-[95vw] sm:w-full max-h-[85vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="text-base sm:text-lg">
               {selectedEmployee?.name}'s Product Activity
             </DialogTitle>
           </DialogHeader>
           
           {!showHourlyBreakdown ? (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Daily Product Updates</h3>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Total Products</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedEmployee && getEmployeeActivity(selectedEmployee.id).map((activity) => (
-                    <TableRow key={activity.date} className="cursor-pointer hover:bg-muted/50" onClick={() => handleDateClick(activity.date)}>
-                      <TableCell>{format(new Date(activity.date), 'MMM dd, yyyy')}</TableCell>
-                      <TableCell>{activity.totalProducts}</TableCell>
-                      <TableCell>
-                        <ChevronDown className="h-4 w-4" />
-                      </TableCell>
+            <div className="space-y-3 sm:space-y-4 flex flex-col flex-1 min-h-0">
+              <h3 className="text-base sm:text-lg font-semibold flex-shrink-0">Daily Product Updates</h3>
+              <div className="overflow-auto flex-1 -mx-2 px-2">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background z-10">
+                    <TableRow>
+                      <TableHead className="text-xs sm:text-sm">Date</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Total Products</TableHead>
+                      <TableHead className="w-8"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedEmployee && getEmployeeActivity(selectedEmployee.id).map((activity) => (
+                      <TableRow key={activity.date} className="cursor-pointer hover:bg-muted/50" onClick={() => handleDateClick(activity.date)}>
+                        <TableCell className="text-xs sm:text-sm py-2 sm:py-4">{format(new Date(activity.date), 'MMM dd, yyyy')}</TableCell>
+                        <TableCell className="text-xs sm:text-sm py-2 sm:py-4">{activity.totalProducts}</TableCell>
+                        <TableCell className="py-2 sm:py-4">
+                          <ChevronDown className="h-4 w-4" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4 flex flex-col flex-1 min-h-0">
               <Button 
                 variant="ghost" 
                 onClick={() => setShowHourlyBreakdown(false)}
-                className="mb-4"
+                className="mb-2 sm:mb-4 w-fit text-sm"
+                size="sm"
               >
-                Back to Daily View
+                ← Back to Daily View
               </Button>
-              <h3 className="text-lg font-semibold">
+              <h3 className="text-base sm:text-lg font-semibold flex-shrink-0">
                 Hourly Breakdown for {selectedDate && format(new Date(selectedDate), 'MMM dd, yyyy')}
               </h3>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Hour</TableHead>
-                    <TableHead>Products Updated</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedEmployee && selectedDate && 
-                    getHourlyBreakdown(selectedEmployee.id, selectedDate).map((hourData) => (
-                      <TableRow key={hourData.hour}>
-                        <TableCell>{hourData.hour}</TableCell>
-                        <TableCell>{hourData.count}</TableCell>
-                      </TableRow>
-                    ))
-                  }
-                </TableBody>
-              </Table>
+              <div className="overflow-auto flex-1 -mx-2 px-2">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background z-10">
+                    <TableRow>
+                      <TableHead className="text-xs sm:text-sm">Hour</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Products Updated</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedEmployee && selectedDate && 
+                      getHourlyBreakdown(selectedEmployee.id, selectedDate).map((hourData) => (
+                        <TableRow key={hourData.hour}>
+                          <TableCell className="text-xs sm:text-sm py-2 sm:py-4">{hourData.hour}</TableCell>
+                          <TableCell className="text-xs sm:text-sm py-2 sm:py-4">{hourData.count}</TableCell>
+                        </TableRow>
+                      ))
+                    }
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
         </DialogContent>

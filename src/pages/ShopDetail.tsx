@@ -56,6 +56,10 @@ const ShopDetail = () => {
   const [activeTab, setActiveTab] = useState("availableProducts");
   const [searchQuery, setSearchQuery] = useState("");
   
+  // Filter states for Available Products tab
+  const [filterCategory, setFilterCategory] = useState<string>("");
+  const [filterAisle, setFilterAisle] = useState<string>("");
+  
   // Selected product for addition
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showAddProductDialog, setShowAddProductDialog] = useState(false);
@@ -518,10 +522,30 @@ const ShopDetail = () => {
     handleSavePrice(productId, regularPrice, offerPrice, offerExpiryDate);
   };
 
+  // Get unique categories and aisles from products for filter options
+  const uniqueCategories = products && products.length > 0
+    ? [...new Set(products.map(p => p.category).filter(Boolean))].sort()
+    : [];
+  const uniqueAisles = products && products.length > 0
+    ? [...new Set(products.map(p => p.aiel).filter(Boolean))].sort((a, b) => {
+        // Try to sort numerically if possible
+        const numA = parseInt(a);
+        const numB = parseInt(b);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.localeCompare(b);
+      })
+    : [];
+
   const filteredProducts = products && products.length > 0
     ? fuzzyFilter(products, searchQuery, (product) => 
         `${product.title} ${product.barcode || ''} ${product.caseBarcode || ''}`
-      )
+      ).filter(product => {
+        // Apply category filter
+        if (filterCategory && product.category !== filterCategory) return false;
+        // Apply aisle filter
+        if (filterAisle && product.aiel !== filterAisle) return false;
+        return true;
+      })
     : [];
 
   return (
@@ -886,7 +910,8 @@ const ShopDetail = () => {
       {/* Available Products Tab */}
       {activeTab === "availableProducts" && (
         <>
-          <div className="mb-3 sm:mb-4">
+          <div className="mb-3 sm:mb-4 space-y-3">
+            {/* Search Input with Scan Button */}
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Input
@@ -915,6 +940,62 @@ const ShopDetail = () => {
                 <Camera className="h-4 w-4" />
               </Button>
             </div>
+
+            {/* Filter Options - Category and Aisle */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              {/* Category Filter */}
+              <div className="flex-1">
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="w-full h-9 px-3 py-1.5 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <option value="">All Categories</option>
+                  {uniqueCategories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Aisle Filter */}
+              <div className="flex-1">
+                <select
+                  value={filterAisle}
+                  onChange={(e) => setFilterAisle(e.target.value)}
+                  className="w-full h-9 px-3 py-1.5 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <option value="">All Aisles</option>
+                  {uniqueAisles.map((aisle) => (
+                    <option key={aisle} value={aisle}>Aisle {aisle}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Clear Filters Button - show only when filters are active */}
+              {(filterCategory || filterAisle) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setFilterCategory("");
+                    setFilterAisle("");
+                  }}
+                  className="flex-shrink-0 text-xs sm:text-sm"
+                >
+                  <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            {/* Active Filters Summary */}
+            {(filterCategory || filterAisle) && (
+              <div className="text-xs sm:text-sm text-muted-foreground">
+                Showing {filteredProducts.length} of {products?.length || 0} products
+                {filterCategory && <span className="ml-1">in <strong>{filterCategory}</strong></span>}
+                {filterAisle && <span className="ml-1">in <strong>Aisle {filterAisle}</strong></span>}
+              </div>
+            )}
             
             {/* Scanner for search */}
             {showSearchScanner && (
