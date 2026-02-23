@@ -302,7 +302,7 @@ const Products = () => {
 
     // Close dialog immediately and clear form
     const formData = new FormData();
-    formData.append("title", productName);
+    formData.append("title", productName.toUpperCase());
     formData.append("rrp", rrp);
     formData.append("caseSize", caseSize);
     formData.append("packetSize", packetSize);
@@ -392,7 +392,8 @@ const Products = () => {
                     <Input
                       placeholder="Enter product name"
                       value={productName}
-                      onChange={(e) => setProductName(e.target.value)}
+                      onChange={(e) => setProductName(e.target.value.toUpperCase())}
+                      className="uppercase"
                     />
                   </div>
                   <div>

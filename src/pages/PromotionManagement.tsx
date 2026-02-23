@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Image, Plus, X, Eye, Package, Store, Calendar, Trash2, FileText, Images } from "lucide-react";
+import { Upload, Image, Plus, X, Eye, Package, Store, Calendar, Trash2, FileText, Images, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { API_CONFIG } from "@/config/api";
 
@@ -26,6 +26,11 @@ interface Product {
   rrp: string;
   price?: string;
   offerPrice?: string;
+}
+
+interface EditableProduct extends Product {
+  editedPrice?: string;
+  editedOfferPrice?: string;
 }
 
 interface Promotion {
@@ -51,6 +56,30 @@ const PromotionManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  // Edit state
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const [editProducts, setEditProducts] = useState<Product[]>([]);
+  const [editSelectedProducts, setEditSelectedProducts] = useState<EditableProduct[]>([]);
+  const [editSearchQuery, setEditSearchQuery] = useState('');
+
+  // Edit form state
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    description: '',
+    shopId: '',
+    imageFile: null as File | null,
+    imagePreview: '',
+    existingImageUrl: '',
+    imageFiles: [] as File[],
+    imagePreviews: [] as string[],
+    existingImageUrls: [] as string[],
+    pdfFile: null as File | null,
+    pdfName: '',
+    existingPdfUrl: ''
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -416,6 +445,231 @@ const PromotionManagement: React.FC = () => {
     }
   };
 
+  // Open edit dialog with promotion data
+  const openEditDialog = (promotion: Promotion) => {
+    setEditingPromotion(promotion);
+    setEditFormData({
+      title: promotion.title,
+      description: promotion.description || '',
+      shopId: promotion.shopId,
+      imageFile: null,
+      imagePreview: '',
+      existingImageUrl: promotion.imageUrl,
+      imageFiles: [],
+      imagePreviews: [],
+      existingImageUrls: promotion.imageUrls || [],
+      pdfFile: null,
+      pdfName: '',
+      existingPdfUrl: promotion.pdfUrl || ''
+    });
+    // Convert products to editable products with prices
+    setEditSelectedProducts(promotion.products.map(p => ({
+      ...p,
+      editedPrice: p.price || '',
+      editedOfferPrice: p.offerPrice || ''
+    })));
+    setEditProducts([]);
+    setEditSearchQuery('');
+    setIsEditDialogOpen(true);
+    // Load products for the shop
+    loadProductsForEdit(promotion.shopId);
+  };
+
+  // Load products for edit dialog
+  const loadProductsForEdit = async (shopId: string, searchTerm?: string) => {
+    try {
+      let url = `${API_BASE}/shop/${shopId}/products?page=1`;
+      if (searchTerm && searchTerm.length >= 3) {
+        url += `&search=${encodeURIComponent(searchTerm)}`;
+      }
+      
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const productsList = data.products || [];
+        const mappedProducts = productsList.map((item: any) => ({
+          id: item.productId,
+          title: item.title,
+          barcode: item.barcode,
+          price: item.price,
+          offerPrice: item.offerPrice,
+          rrp: item.rrp,
+          img: item.img
+        }));
+        setEditProducts(mappedProducts);
+      }
+    } catch (error) {
+      console.error('Error loading products for edit:', error);
+    }
+  };
+
+  // Handle edit image upload
+  const handleEditImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setEditFormData(prev => ({ ...prev, imageFile: file }));
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setEditFormData(prev => ({ ...prev, imagePreview: e.target?.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle multiple images upload for edit
+  const handleEditMultipleImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files);
+      setEditFormData(prev => ({ ...prev, imageFiles: [...prev.imageFiles, ...fileArray] }));
+      fileArray.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setEditFormData(prev => ({ 
+            ...prev, 
+            imagePreviews: [...prev.imagePreviews, e.target?.result as string] 
+          }));
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  // Remove carousel image from edit
+  const removeEditCarouselImage = (index: number, isExisting: boolean) => {
+    if (isExisting) {
+      setEditFormData(prev => ({
+        ...prev,
+        existingImageUrls: prev.existingImageUrls.filter((_, i) => i !== index)
+      }));
+    } else {
+      setEditFormData(prev => ({
+        ...prev,
+        imageFiles: prev.imageFiles.filter((_, i) => i !== index),
+        imagePreviews: prev.imagePreviews.filter((_, i) => i !== index)
+      }));
+    }
+  };
+
+  // Handle PDF upload for edit
+  const handleEditPdfUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type === 'application/pdf') {
+      setEditFormData(prev => ({ ...prev, pdfFile: file, pdfName: file.name }));
+    } else {
+      toast.error('Please upload a PDF file');
+    }
+  };
+
+  // Remove PDF from edit
+  const removeEditPdf = () => {
+    setEditFormData(prev => ({ ...prev, pdfFile: null, pdfName: '', existingPdfUrl: '' }));
+  };
+
+  // Add product to edit selection
+  const addEditProduct = (product: Product) => {
+    if (!editSelectedProducts.find(p => p.id === product.id)) {
+      setEditSelectedProducts(prev => [...prev, {
+        ...product,
+        editedPrice: product.price || '',
+        editedOfferPrice: product.offerPrice || ''
+      }]);
+    }
+  };
+
+  // Remove product from edit selection
+  const removeEditProduct = (productId: string) => {
+    setEditSelectedProducts(prev => prev.filter(p => p.id !== productId));
+  };
+
+  // Update product price in edit
+  const updateEditProductPrice = (productId: string, field: 'editedPrice' | 'editedOfferPrice', value: string) => {
+    setEditSelectedProducts(prev => prev.map(p => 
+      p.id === productId ? { ...p, [field]: value } : p
+    ));
+  };
+
+  // Helper to format price input
+  const formatPriceInput = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (!digits) return '';
+    const num = parseInt(digits, 10);
+    return (num / 100).toFixed(2);
+  };
+
+  // Update promotion
+  const updatePromotion = async () => {
+    if (!editingPromotion) return;
+    
+    if (!editFormData.title || editSelectedProducts.length === 0) {
+      toast.error('Please fill title and select at least one product');
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const formDataToSend = new FormData();
+      formDataToSend.append('title', editFormData.title);
+      formDataToSend.append('description', editFormData.description);
+      formDataToSend.append('shopId', editFormData.shopId);
+      formDataToSend.append('productIds', JSON.stringify(editSelectedProducts.map(p => p.id)));
+      
+      // Send product prices as JSON
+      const productPrices = editSelectedProducts.map(p => ({
+        productId: p.id,
+        price: p.editedPrice || null,
+        offerPrice: p.editedOfferPrice || null
+      }));
+      formDataToSend.append('productPrices', JSON.stringify(productPrices));
+      
+      // Add new primary image if uploaded
+      if (editFormData.imageFile) {
+        formDataToSend.append('image', editFormData.imageFile);
+      }
+      
+      // Add new carousel images
+      editFormData.imageFiles.forEach((file) => {
+        formDataToSend.append('images', file);
+      });
+      
+      // Send existing image URLs to keep
+      formDataToSend.append('keepExistingImageUrls', JSON.stringify(editFormData.existingImageUrls));
+      formDataToSend.append('keepExistingPrimaryImage', (!editFormData.imageFile && editFormData.existingImageUrl) ? 'true' : 'false');
+      
+      // Add PDF if uploaded
+      if (editFormData.pdfFile) {
+        formDataToSend.append('pdf', editFormData.pdfFile);
+      }
+      formDataToSend.append('keepExistingPdf', editFormData.existingPdfUrl ? 'true' : 'false');
+
+      const response = await fetch(`${API_BASE}/promotions/${editingPromotion.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formDataToSend
+      });
+
+      if (response.ok) {
+        toast.success('✅ Promotion updated successfully!');
+        setIsEditDialogOpen(false);
+        setEditingPromotion(null);
+        loadPromotions();
+      } else {
+        const error = await response.json();
+        toast.error(`Failed to update promotion: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error updating promotion:', error);
+      toast.error(`Network error: ${error.message || 'Please check if server is running'}`);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       title: '',
@@ -760,6 +1014,13 @@ const PromotionManagement: React.FC = () => {
                   <div className="flex gap-2">
                     <Button
                       size="sm"
+                      variant="outline"
+                      onClick={() => openEditDialog(promotion)}
+                    >
+                      <Pencil size={16} />
+                    </Button>
+                    <Button
+                      size="sm"
                       variant={promotion.isActive ? "secondary" : "default"}
                       onClick={() => togglePromotionStatus(promotion.id, promotion.isActive)}
                     >
@@ -856,6 +1117,333 @@ const PromotionManagement: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Edit Promotion Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Promotion</DialogTitle>
+            <DialogDescription>
+              Modify promotion details, images, and products
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Basic Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Promotion Title *</label>
+                <Input
+                  value={editFormData.title}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter promotion title"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Shop</label>
+                <Input
+                  value={editingPromotion?.shop.name || ''}
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Description</label>
+              <Textarea
+                value={editFormData.description}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter promotion description"
+                rows={3}
+              />
+            </div>
+
+            {/* Primary Image */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Primary Promotion Image</label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                {editFormData.imagePreview ? (
+                  <div className="relative">
+                    <img 
+                      src={editFormData.imagePreview} 
+                      alt="New Preview" 
+                      className="max-h-48 mx-auto rounded"
+                    />
+                    <Badge className="absolute top-2 left-2 bg-green-500">New</Badge>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={() => setEditFormData(prev => ({ ...prev, imageFile: null, imagePreview: '' }))}
+                    >
+                      <X size={16} />
+                    </Button>
+                  </div>
+                ) : editFormData.existingImageUrl ? (
+                  <div className="relative">
+                    <img 
+                      src={editFormData.existingImageUrl} 
+                      alt="Current" 
+                      className="max-h-48 mx-auto rounded"
+                    />
+                    <Badge className="absolute top-2 left-2">Current</Badge>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={() => setEditFormData(prev => ({ ...prev, existingImageUrl: '' }))}
+                    >
+                      <X size={16} />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <Upload className="mx-auto mb-4" size={48} />
+                    <p className="text-sm text-muted-foreground mb-4">Upload a new primary image</p>
+                  </div>
+                )}
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleEditImageUpload}
+                  className="max-w-xs mx-auto mt-4"
+                />
+              </div>
+            </div>
+
+            {/* Carousel Images */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">
+                <Images className="inline mr-2" size={16} />
+                Additional Images (Carousel)
+              </label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                {(editFormData.existingImageUrls.length > 0 || editFormData.imagePreviews.length > 0) && (
+                  <div className="grid grid-cols-4 gap-3 mb-4">
+                    {editFormData.existingImageUrls.map((url, index) => (
+                      <div key={`existing-${index}`} className="relative">
+                        <img 
+                          src={url} 
+                          alt={`Existing ${index + 1}`} 
+                          className="w-full h-24 object-cover rounded"
+                        />
+                        <Badge className="absolute top-1 left-1 text-xs">Current</Badge>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                          onClick={() => removeEditCarouselImage(index, true)}
+                        >
+                          <X size={12} />
+                        </Button>
+                      </div>
+                    ))}
+                    {editFormData.imagePreviews.map((preview, index) => (
+                      <div key={`new-${index}`} className="relative">
+                        <img 
+                          src={preview} 
+                          alt={`New ${index + 1}`} 
+                          className="w-full h-24 object-cover rounded"
+                        />
+                        <Badge className="absolute top-1 left-1 text-xs bg-green-500">New</Badge>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                          onClick={() => removeEditCarouselImage(index, false)}
+                        >
+                          <X size={12} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground mb-2">Add more images</p>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleEditMultipleImagesUpload}
+                    className="max-w-xs mx-auto"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* PDF Document */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">
+                <FileText className="inline mr-2" size={16} />
+                PDF Document
+              </label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                {editFormData.pdfFile ? (
+                  <div className="flex items-center justify-between bg-green-100 p-3 rounded">
+                    <div className="flex items-center gap-2">
+                      <FileText size={24} className="text-green-600" />
+                      <span className="text-sm font-medium">{editFormData.pdfName} (New)</span>
+                    </div>
+                    <Button variant="destructive" size="sm" onClick={removeEditPdf}>
+                      <X size={16} />
+                    </Button>
+                  </div>
+                ) : editFormData.existingPdfUrl ? (
+                  <div className="flex items-center justify-between bg-gray-100 p-3 rounded">
+                    <div className="flex items-center gap-2">
+                      <FileText size={24} className="text-red-500" />
+                      <a href={editFormData.existingPdfUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">
+                        View Current PDF
+                      </a>
+                    </div>
+                    <Button variant="destructive" size="sm" onClick={removeEditPdf}>
+                      <X size={16} />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <FileText className="mx-auto mb-2 text-muted-foreground" size={32} />
+                    <p className="text-sm text-muted-foreground mb-2">Upload a PDF document</p>
+                  </div>
+                )}
+                <Input
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={handleEditPdfUpload}
+                  className="max-w-xs mx-auto mt-2"
+                />
+              </div>
+            </div>
+
+            {/* Product Selection & Editing */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Products in Promotion *</label>
+              
+              {/* Selected Products with Price Editing */}
+              {editSelectedProducts.length > 0 && (
+                <div className="mb-4 border rounded-lg p-4 bg-muted/30">
+                  <h4 className="font-medium mb-3">Selected Products ({editSelectedProducts.length})</h4>
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {editSelectedProducts.map((product) => (
+                      <div key={product.id} className="flex items-center gap-3 p-3 bg-background rounded-lg border">
+                        {product.img && (
+                          <img 
+                            src={product.img} 
+                            alt={product.title}
+                            className="w-12 h-12 object-cover rounded"
+                          />
+                        )}
+                        <div className="flex-grow min-w-0">
+                          <p className="font-medium truncate">{product.title}</p>
+                          <p className="text-xs text-muted-foreground">RRP: £{Number(product.rrp || 0).toFixed(2)}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-24">
+                            <label className="text-xs text-muted-foreground">Price</label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">£</span>
+                              <Input
+                                className="pl-5 h-8 text-sm"
+                                placeholder="0.00"
+                                value={product.editedPrice}
+                                onChange={(e) => {
+                                  const formatted = formatPriceInput(e.target.value);
+                                  updateEditProductPrice(product.id, 'editedPrice', formatted);
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="w-24">
+                            <label className="text-xs text-muted-foreground">Offer</label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">£</span>
+                              <Input
+                                className="pl-5 h-8 text-sm"
+                                placeholder="0.00"
+                                value={product.editedOfferPrice}
+                                onChange={(e) => {
+                                  const formatted = formatPriceInput(e.target.value);
+                                  updateEditProductPrice(product.id, 'editedOfferPrice', formatted);
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => removeEditProduct(product.id)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Search and Add Products */}
+              <Input
+                value={editSearchQuery}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEditSearchQuery(value);
+                  if (value.length >= 3 && editFormData.shopId) {
+                    loadProductsForEdit(editFormData.shopId, value);
+                  } else if (value.length === 0 && editFormData.shopId) {
+                    loadProductsForEdit(editFormData.shopId);
+                  }
+                }}
+                placeholder="Search products to add... (type 3+ characters)"
+                className="mb-4"
+              />
+
+              {/* Available Products */}
+              <div className="max-h-48 overflow-y-auto border rounded">
+                {editProducts.filter(p => !editSelectedProducts.find(sp => sp.id === p.id)).map((product) => (
+                  <div key={product.id} className="flex items-center justify-between p-3 border-b hover:bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      {product.img && (
+                        <img 
+                          src={product.img} 
+                          alt={product.title}
+                          className="w-10 h-10 object-cover rounded"
+                        />
+                      )}
+                      <div>
+                        <p className="font-medium">{product.title}</p>
+                        <p className="text-sm text-green-600">£{Number(product.price || product.rrp || 0).toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addEditProduct(product)}
+                    >
+                      <Plus size={16} />
+                    </Button>
+                  </div>
+                ))}
+                {editProducts.length === 0 && editSearchQuery.length >= 3 && (
+                  <p className="p-4 text-center text-muted-foreground">No products found</p>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={updatePromotion} disabled={updating}>
+                {updating ? 'Updating...' : 'Update Promotion'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

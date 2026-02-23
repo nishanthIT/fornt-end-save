@@ -114,7 +114,7 @@ export const ProductCard = ({
     setIsSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append("title", editForm.title);
+      formData.append("title", editForm.title.toUpperCase());
       formData.append("barcode", editForm.barcode);
       formData.append("caseBarcode", editForm.caseBarcode);
       formData.append("caseSize", editForm.caseSize);
@@ -258,7 +258,8 @@ export const ProductCard = ({
                 <Input
                   placeholder="Enter product name"
                   value={editForm.title}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value.toUpperCase() }))}
+                  className="uppercase"
                 />
               </div>
               <div>
