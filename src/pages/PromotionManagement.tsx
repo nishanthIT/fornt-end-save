@@ -52,7 +52,7 @@ const PromotionManagement: React.FC = () => {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<EditableProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -335,15 +335,35 @@ const PromotionManagement: React.FC = () => {
       console.log('➕ Adding product:', {
         title: product.title,
         price: product.price,
+        offerPrice: product.offerPrice,
         rrp: product.rrp,
         id: product.id
       });
-      setSelectedProducts(prev => [...prev, product]);
+      setSelectedProducts(prev => [...prev, {
+        ...product,
+        editedPrice: product.price || '',
+        editedOfferPrice: product.offerPrice || ''
+      }]);
     }
   };
 
   const removeProduct = (productId: string) => {
     setSelectedProducts(prev => prev.filter(p => p.id !== productId));
+  };
+
+  // Update product price in create promotion
+  const updateProductPrice = (productId: string, field: 'editedPrice' | 'editedOfferPrice', value: string) => {
+    setSelectedProducts(prev => prev.map(p => 
+      p.id === productId ? { ...p, [field]: value } : p
+    ));
+  };
+
+  // Helper to format price input
+  const formatPrice = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (!digits) return '';
+    const num = parseInt(digits, 10);
+    return (num / 100).toFixed(2);
   };
 
   const createPromotion = async () => {
@@ -362,6 +382,14 @@ const PromotionManagement: React.FC = () => {
       formDataToSend.append('description', formData.description);
       formDataToSend.append('shopId', formData.shopId);
       formDataToSend.append('productIds', JSON.stringify(selectedProducts.map(p => p.id)));
+      
+      // Send product prices (offer prices) for each product
+      const productPrices = selectedProducts.map(p => ({
+        productId: p.id,
+        price: p.editedPrice || null,
+        offerPrice: p.editedOfferPrice || null
+      }));
+      formDataToSend.append('productPrices', JSON.stringify(productPrices));
       
       // Add single image if provided (legacy support)
       if (formData.imageFile) {
@@ -893,6 +921,60 @@ const PromotionManagement: React.FC = () => {
               {/* Product Selection */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Select Products *</label>
+                
+                {/* Selected Products with Offer Price Editing */}
+                {selectedProducts.length > 0 && (
+                  <div className="mb-4 border rounded-lg p-4 bg-muted/30">
+                    <h4 className="font-medium mb-3">Selected Products ({selectedProducts.length})</h4>
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {selectedProducts.map((product) => (
+                        <div key={product.id} className="flex items-center gap-3 p-3 bg-background rounded-lg border">
+                          {product.img && (
+                            <img 
+                              src={product.img} 
+                              alt={product.title}
+                              className="w-12 h-12 object-cover rounded"
+                            />
+                          )}
+                          <div className="flex-grow min-w-0">
+                            <p className="font-medium truncate">{product.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              RRP: £{Number(product.rrp || 0).toFixed(2)} | 
+                              Current Price: £{Number(product.price || product.rrp || 0).toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-24">
+                              <label className="text-xs text-muted-foreground">Offer Price *</label>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">£</span>
+                                <Input
+                                  className="pl-5 h-8 text-sm"
+                                  placeholder="0.00"
+                                  value={product.editedOfferPrice}
+                                  onChange={(e) => {
+                                    const formatted = formatPrice(e.target.value);
+                                    updateProductPrice(product.id, 'editedOfferPrice', formatted);
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => removeProduct(product.id)}
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Search Products */}
                 <Input
                   value={searchQuery}
                   onChange={(e) => {
@@ -910,32 +992,21 @@ const PromotionManagement: React.FC = () => {
                       loadProducts(formData.shopId);
                     }
                   }}
-                  placeholder="Search products... (type 3+ characters)"
+                  placeholder="Search products in this shop... (type 3+ characters)"
                   className="mb-4"
                 />
-                
-                {/* Selected Products */}
-                {selectedProducts.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="font-medium mb-2">Selected Products ({selectedProducts.length})</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedProducts.map((product) => (
-                        <Badge key={product.id} variant="secondary" className="flex items-center gap-1">
-                          {product.title}
-                          <X 
-                            size={12} 
-                            className="cursor-pointer hover:text-red-500" 
-                            onClick={() => removeProduct(product.id)}
-                          />
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
+
+                {/* Info about products */}
+                {formData.shopId && (
+                  <p className="text-xs text-muted-foreground mb-2">
+                    <Store size={12} className="inline mr-1" />
+                    Showing products available in the selected shop only
+                  </p>
                 )}
 
                 {/* Available Products */}
                 <div className="max-h-64 overflow-y-auto border rounded">
-                  {filteredProducts.map((product) => (
+                  {filteredProducts.filter(p => !selectedProducts.find(sp => sp.id === p.id)).map((product) => (
                     <div key={product.id} className="flex items-center justify-between p-3 border-b hover:bg-muted/50">
                       <div className="flex items-center gap-3">
                         {product.img && (
@@ -950,19 +1021,33 @@ const PromotionManagement: React.FC = () => {
                           {product.barcode && (
                             <p className="text-sm text-muted-foreground">{product.barcode}</p>
                           )}
-                          <p className="text-sm text-green-600">£{Number(product.price || product.rrp || 0).toFixed(2)}</p>
+                          <div className="flex gap-2 text-sm">
+                            <span className="text-green-600">£{Number(product.price || product.rrp || 0).toFixed(2)}</span>
+                            {product.offerPrice && (
+                              <span className="text-orange-600">Offer: £{Number(product.offerPrice).toFixed(2)}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <Button
                         size="sm"
-                        variant={selectedProducts.find(p => p.id === product.id) ? "secondary" : "outline"}
+                        variant="outline"
                         onClick={() => addProduct(product)}
-                        disabled={!!selectedProducts.find(p => p.id === product.id)}
                       >
-                        {selectedProducts.find(p => p.id === product.id) ? 'Added' : <Plus size={16} />}
+                        <Plus size={16} />
                       </Button>
                     </div>
                   ))}
+                  {filteredProducts.length === 0 && formData.shopId && (
+                    <p className="p-4 text-center text-muted-foreground">
+                      {searchQuery.length >= 3 ? 'No products found' : 'Type 3+ characters to search products'}
+                    </p>
+                  )}
+                  {!formData.shopId && (
+                    <p className="p-4 text-center text-muted-foreground">
+                      Please select a shop first
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1099,7 +1184,14 @@ const PromotionManagement: React.FC = () => {
                             />
                           )}
                           <span>{product.title}</span>
-                          <span className="text-green-600 ml-auto">£{Number(product.price || product.rrp || 0).toFixed(2)}</span>
+                          <div className="ml-auto flex gap-2">
+                            {product.offerPrice && (
+                              <span className="text-orange-600 font-medium">£{Number(product.offerPrice).toFixed(2)}</span>
+                            )}
+                            <span className={product.offerPrice ? "text-muted-foreground line-through text-xs" : "text-green-600"}>
+                              £{Number(product.price || product.rrp || 0).toFixed(2)}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
