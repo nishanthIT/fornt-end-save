@@ -4,10 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, Tag, Clock, PoundSterling, Pencil, Upload, X } from "lucide-react";
+import { Calendar, Tag, Clock, PoundSterling, Pencil, Upload, X, Tags } from "lucide-react";
 import { getImageUrl } from "@/utils/imageUtils";
 import { toast } from "sonner";
 import { CategorySelect } from "@/components/CategorySelect";
+import { MultiPromotionDialog } from "@/components/MultiPromotionDialog";
 
 interface ProductAtShopCardProps {
   productId: string;
@@ -111,6 +112,9 @@ export const ProductAtShopCard = ({
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Multi-promotion dialog state
+  const [showMultiPromotionDialog, setShowMultiPromotionDialog] = useState(false);
 
   const currentPrice = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date() ? offerPrice : price;
   const hasActiveOffer = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date();
@@ -407,7 +411,7 @@ export const ProductAtShopCard = ({
                   RRP: £{rrp.toFixed(2)}
                 </div>
               )}
-              <div className="flex gap-3 mt-1">
+              <div className="flex gap-1 mt-1">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -427,6 +431,15 @@ export const ProductAtShopCard = ({
                   title="Edit Product"
                 >
                   <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowMultiPromotionDialog(true)}
+                  className="h-7 w-7 p-0"
+                  title="Manage Promotions"
+                >
+                  <Tags className="h-4 w-4" />
                 </Button>
                 <Button
                   variant={hasActiveOffer ? "default" : "outline"}
@@ -677,6 +690,17 @@ export const ProductAtShopCard = ({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Multi-Promotion Dialog */}
+      <MultiPromotionDialog
+        open={showMultiPromotionDialog}
+        onOpenChange={setShowMultiPromotionDialog}
+        shopId={shopId}
+        productId={productId}
+        productTitle={title}
+        regularPrice={price}
+        onPromotionsUpdated={onProductUpdated}
+      />
     </Card>
   );
 };

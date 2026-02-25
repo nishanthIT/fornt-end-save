@@ -42,6 +42,8 @@ interface Promotion {
   pdfUrl?: string;       // PDF document URL
   shopId: string;
   isActive: boolean;
+  startDate?: string;    // Promotion start date
+  endDate?: string;      // Optional end date - null means never expires
   createdAt: string;
   updatedAt: string;
   shop: Shop;
@@ -78,7 +80,9 @@ const PromotionManagement: React.FC = () => {
     existingImageUrls: [] as string[],
     pdfFile: null as File | null,
     pdfName: '',
-    existingPdfUrl: ''
+    existingPdfUrl: '',
+    startDate: '',
+    endDate: ''
   });
 
   // Form state
@@ -91,7 +95,9 @@ const PromotionManagement: React.FC = () => {
     imageFiles: [] as File[],      // Multiple images for carousel
     imagePreviews: [] as string[], // Preview URLs for multiple images
     pdfFile: null as File | null,  // PDF file
-    pdfName: ''                     // PDF filename for display
+    pdfName: '',                    // PDF filename for display
+    startDate: '',                  // Promotion start date
+    endDate: ''                     // Optional end date - empty means never expires
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -130,7 +136,9 @@ const PromotionManagement: React.FC = () => {
         imageFiles: [],
         imagePreviews: [],
         pdfFile: null,
-        pdfName: ''
+        pdfName: '',
+        startDate: '',
+        endDate: ''
       });
       setProducts([]);
       setSelectedProducts([]);
@@ -405,6 +413,14 @@ const PromotionManagement: React.FC = () => {
       if (formData.pdfFile) {
         formDataToSend.append('pdf', formData.pdfFile);
       }
+      
+      // Add start date (use today if not specified)
+      formDataToSend.append('startDate', formData.startDate || new Date().toISOString().split('T')[0]);
+      
+      // Add end date (optional - empty means never expires)
+      if (formData.endDate) {
+        formDataToSend.append('endDate', formData.endDate);
+      }
 
       const response = await fetch(`${API_BASE}/promotions`, {
         method: 'POST',
@@ -488,7 +504,9 @@ const PromotionManagement: React.FC = () => {
       existingImageUrls: promotion.imageUrls || [],
       pdfFile: null,
       pdfName: '',
-      existingPdfUrl: promotion.pdfUrl || ''
+      existingPdfUrl: promotion.pdfUrl || '',
+      startDate: promotion.startDate ? new Date(promotion.startDate).toISOString().split('T')[0] : '',
+      endDate: promotion.endDate ? new Date(promotion.endDate).toISOString().split('T')[0] : ''
     });
     // Convert products to editable products with prices
     setEditSelectedProducts(promotion.products.map(p => ({
@@ -672,6 +690,18 @@ const PromotionManagement: React.FC = () => {
         formDataToSend.append('pdf', editFormData.pdfFile);
       }
       formDataToSend.append('keepExistingPdf', editFormData.existingPdfUrl ? 'true' : 'false');
+      
+      // Add start date
+      if (editFormData.startDate) {
+        formDataToSend.append('startDate', editFormData.startDate);
+      }
+      
+      // Add end date (optional)
+      if (editFormData.endDate) {
+        formDataToSend.append('endDate', editFormData.endDate);
+      } else {
+        formDataToSend.append('endDate', ''); // Empty string = null (no expiry)
+      }
 
       const response = await fetch(`${API_BASE}/promotions/${editingPromotion.id}`, {
         method: 'PUT',
@@ -708,7 +738,9 @@ const PromotionManagement: React.FC = () => {
       imageFiles: [],
       imagePreviews: [],
       pdfFile: null,
-      pdfName: ''
+      pdfName: '',
+      startDate: '',
+      endDate: ''
     });
     setSelectedProducts([]);
   };
@@ -797,6 +829,36 @@ const PromotionManagement: React.FC = () => {
                   placeholder="Enter promotion description"
                   rows={3}
                 />
+              </div>
+
+              {/* Start and End Date */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    <Calendar className="inline mr-2" size={16} />
+                    Start Date
+                  </label>
+                  <Input
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                    placeholder="Select start date"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Leave empty for today</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    <Calendar className="inline mr-2" size={16} />
+                    End Date <span className="text-muted-foreground">(optional)</span>
+                  </label>
+                  <Input
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                    placeholder="Select end date"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Leave empty for no expiry (auto-deactivate disabled)</p>
+                </div>
               </div>
 
               {/* Image Upload */}
@@ -1078,7 +1140,11 @@ const PromotionManagement: React.FC = () => {
             </CardContent>
           </Card>
         ) : (
-          promotions.map((promotion) => (
+          promotions.map((promotion) => {
+            const isExpired = promotion.endDate && new Date(promotion.endDate) < new Date();
+            const isUpcoming = promotion.startDate && new Date(promotion.startDate) > new Date();
+            
+            return (
             <Card key={promotion.id}>
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -1088,12 +1154,21 @@ const PromotionManagement: React.FC = () => {
                       <Badge variant={promotion.isActive ? "default" : "secondary"}>
                         {promotion.isActive ? 'Active' : 'Inactive'}
                       </Badge>
+                      {isExpired && (
+                        <Badge variant="destructive">Expired</Badge>
+                      )}
+                      {isUpcoming && (
+                        <Badge variant="outline" className="bg-yellow-100">Upcoming</Badge>
+                      )}
                     </CardTitle>
                     <CardDescription>
                       <Store size={14} className="inline mr-1" />
                       {promotion.shop.name} • {promotion.products.length} products
-                      <Calendar size={14} className="inline ml-3 mr-1" />
-                      {new Date(promotion.createdAt).toLocaleDateString()}
+                      <br />
+                      <Calendar size={14} className="inline mr-1" />
+                      {promotion.startDate ? new Date(promotion.startDate).toLocaleDateString() : 'Started'} 
+                      {' - '}
+                      {promotion.endDate ? new Date(promotion.endDate).toLocaleDateString() : 'No expiry'}
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
@@ -1206,7 +1281,8 @@ const PromotionManagement: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -1249,6 +1325,33 @@ const PromotionManagement: React.FC = () => {
                 placeholder="Enter promotion description"
                 rows={3}
               />
+            </div>
+
+            {/* Start and End Date */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  <Calendar className="inline mr-2" size={16} />
+                  Start Date
+                </label>
+                <Input
+                  type="date"
+                  value={editFormData.startDate}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  <Calendar className="inline mr-2" size={16} />
+                  End Date <span className="text-muted-foreground">(optional)</span>
+                </label>
+                <Input
+                  type="date"
+                  value={editFormData.endDate}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Leave empty for no expiry (auto-deactivate disabled)</p>
+              </div>
             </div>
 
             {/* Primary Image */}

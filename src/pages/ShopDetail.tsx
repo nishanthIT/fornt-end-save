@@ -26,7 +26,6 @@ import { OptimizedScanner } from "@/components/OptimizedScanner";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { getImageUrl } from "@/utils/imageUtils";
-import { fuzzyFilter } from "@/utils/fuzzySearch";
 import { CategorySelect } from "@/components/CategorySelect";
 
 const ShopDetail = () => {
@@ -59,6 +58,12 @@ const ShopDetail = () => {
   // Filter states for Available Products tab
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [filterAisle, setFilterAisle] = useState<string>("");
+  const [availableProductsSearch, setAvailableProductsSearch] = useState<string>("");
+  const [availableProductsPage, setAvailableProductsPage] = useState<number>(1);
+  
+  // Shop filters (categories and aisles from API)
+  const [shopCategories, setShopCategories] = useState<string[]>([]);
+  const [shopAisles, setShopAisles] = useState<string[]>([]);
   
   // Selected product for addition
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -170,8 +175,14 @@ const ShopDetail = () => {
     products: productsAtShop, 
     loading: productsAtShopLoading, 
     error: productsAtShopError,
+    pagination: productsAtShopPagination,
     refetch: refetchProductsAtShop 
-  } = useFetchProductsAtShop(id, refreshTrigger);
+  } = useFetchProductsAtShop(id, refreshTrigger, {
+    page: availableProductsPage,
+    search: availableProductsSearch,
+    category: filterCategory,
+    aisle: filterAisle
+  });
   const { shop, loading: shopLoading, error: shopError } = useFetchShopById(id);
 
   const [products, setProducts] = useState([]);
@@ -181,6 +192,37 @@ const ShopDetail = () => {
       setProducts(productsAtShop);
     }
   }, [productsAtShop]);
+
+  // Fetch shop categories and aisles
+  useEffect(() => {
+    const fetchShopFilters = async () => {
+      if (!id) return;
+      try {
+        const auth_token = localStorage.getItem('auth_token');
+        const response = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${id}/filters`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              ...(auth_token && { Authorization: `Bearer ${auth_token}` }),
+            },
+            credentials: 'include'
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          setShopCategories(data.categories || []);
+          setShopAisles(data.aisles || []);
+        }
+      } catch (error) {
+        console.error("Error fetching shop filters:", error);
+      }
+    };
+    
+    fetchShopFilters();
+  }, [id, refreshTrigger]);
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -522,31 +564,14 @@ const ShopDetail = () => {
     handleSavePrice(productId, regularPrice, offerPrice, offerExpiryDate);
   };
 
-  // Get unique categories and aisles from products for filter options
-  const uniqueCategories = products && products.length > 0
-    ? [...new Set(products.map(p => p.category).filter(Boolean))].sort()
-    : [];
-  const uniqueAisles = products && products.length > 0
-    ? [...new Set(products.map(p => p.aiel).filter(Boolean))].sort((a, b) => {
-        // Try to sort numerically if possible
-        const numA = parseInt(a);
-        const numB = parseInt(b);
-        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-        return a.localeCompare(b);
-      })
-    : [];
+  // Reset pagination when filters change
+  useEffect(() => {
+    setAvailableProductsPage(1);
+  }, [availableProductsSearch, filterCategory, filterAisle]);
 
-  const filteredProducts = products && products.length > 0
-    ? fuzzyFilter(products, searchQuery, (product) => 
-        `${product.title} ${product.barcode || ''} ${product.caseBarcode || ''}`
-      ).filter(product => {
-        // Apply category filter
-        if (filterCategory && product.category !== filterCategory) return false;
-        // Apply aisle filter
-        if (filterAisle && product.aiel !== filterAisle) return false;
-        return true;
-      })
-    : [];
+  // Products are already filtered by API, no need for client-side filtering
+  // Keep this for backward compatibility with other UI parts that might use it
+  const filteredProducts = products || [];
 
   return (
     <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-6">
@@ -916,16 +941,16 @@ const ShopDetail = () => {
               <div className="relative flex-1">
                 <Input
                   placeholder="Search for a product..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={availableProductsSearch}
+                  onChange={(e) => setAvailableProductsSearch(e.target.value)}
                   className="pr-8"
                 />
-                {searchQuery && (
+                {availableProductsSearch && (
                   <Button
                     variant="ghost"
                     size="sm"
                     className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
-                    onClick={() => setSearchQuery("")}
+                    onClick={() => setAvailableProductsSearch("")}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -951,7 +976,7 @@ const ShopDetail = () => {
                   className="w-full h-9 px-3 py-1.5 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
                   <option value="">All Categories</option>
-                  {uniqueCategories.map((cat) => (
+                  {shopCategories.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
@@ -965,20 +990,21 @@ const ShopDetail = () => {
                   className="w-full h-9 px-3 py-1.5 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
                   <option value="">All Aisles</option>
-                  {uniqueAisles.map((aisle) => (
+                  {shopAisles.map((aisle) => (
                     <option key={aisle} value={aisle}>Aisle {aisle}</option>
                   ))}
                 </select>
               </div>
 
               {/* Clear Filters Button - show only when filters are active */}
-              {(filterCategory || filterAisle) && (
+              {(filterCategory || filterAisle || availableProductsSearch) && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
                     setFilterCategory("");
                     setFilterAisle("");
+                    setAvailableProductsSearch("");
                   }}
                   className="flex-shrink-0 text-xs sm:text-sm"
                 >
@@ -989,11 +1015,12 @@ const ShopDetail = () => {
             </div>
 
             {/* Active Filters Summary */}
-            {(filterCategory || filterAisle) && (
+            {(filterCategory || filterAisle || availableProductsSearch) && (
               <div className="text-xs sm:text-sm text-muted-foreground">
-                Showing {filteredProducts.length} of {products?.length || 0} products
+                Showing {filteredProducts.length} of {productsAtShopPagination?.total || 0} products
                 {filterCategory && <span className="ml-1">in <strong>{filterCategory}</strong></span>}
                 {filterAisle && <span className="ml-1">in <strong>Aisle {filterAisle}</strong></span>}
+                {availableProductsSearch && <span className="ml-1">matching <strong>"{availableProductsSearch}"</strong></span>}
               </div>
             )}
             
@@ -1002,7 +1029,7 @@ const ShopDetail = () => {
               <div className="mt-2 rounded-lg overflow-hidden border">
                 <OptimizedScanner
                   onScan={(result) => {
-                    setSearchQuery(result);
+                    setAvailableProductsSearch(result);
                     setShowSearchScanner(false);
                     toast.success(`Barcode scanned: ${result}`);
                   }}
@@ -1053,8 +1080,70 @@ const ShopDetail = () => {
                   />
                 ))
               ) : (
-                <div>No products found. {products && products.length > 0 ? `Found ${products.length} products total, but none match the current search.` : "No products available in this shop yet."}</div>
+                <div>No products found. {availableProductsSearch || filterCategory || filterAisle ? "Try adjusting your search or filters." : "No products available in this shop yet."}</div>
               )}
+            </div>
+          )}
+          
+          {/* Pagination */}
+          {productsAtShopPagination && productsAtShopPagination.totalPages > 1 && (
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-sm text-muted-foreground">
+                Page {productsAtShopPagination.page} of {productsAtShopPagination.totalPages} 
+                ({productsAtShopPagination.total} total products)
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAvailableProductsPage(prev => Math.max(1, prev - 1))}
+                  disabled={availableProductsPage <= 1 || productsAtShopLoading}
+                >
+                  Previous
+                </Button>
+                
+                {/* Page numbers */}
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(5, productsAtShopPagination.totalPages) }, (_, i) => {
+                    // Calculate which page numbers to show
+                    let pageNum;
+                    const totalPages = productsAtShopPagination.totalPages;
+                    const currentPage = availableProductsPage;
+                    
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={pageNum === currentPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setAvailableProductsPage(pageNum)}
+                        disabled={productsAtShopLoading}
+                        className="min-w-[36px]"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAvailableProductsPage(prev => Math.min(productsAtShopPagination.totalPages, prev + 1))}
+                  disabled={availableProductsPage >= productsAtShopPagination.totalPages || productsAtShopLoading}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </>
