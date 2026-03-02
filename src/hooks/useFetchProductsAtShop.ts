@@ -13,6 +13,7 @@ interface FetchParams {
   search?: string;
   category?: string;
   aisle?: string;
+  stockStatus?: string;
 }
 
 const useFetchProductsAtShop = (
@@ -51,6 +52,7 @@ const useFetchProductsAtShop = (
       if (currentParams.search) queryParams.append('search', currentParams.search);
       if (currentParams.category) queryParams.append('category', currentParams.category);
       if (currentParams.aisle) queryParams.append('aisle', currentParams.aisle);
+      if (currentParams.stockStatus) queryParams.append('stockStatus', currentParams.stockStatus);
       
       const queryString = queryParams.toString();
       const url = `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${shopId}/products${queryString ? `?${queryString}` : ''}`;
@@ -98,7 +100,7 @@ const useFetchProductsAtShop = (
     } finally {
       setLoading(false);
     }
-  }, [shopId, params.page, params.search, params.category, params.aisle]);
+  }, [shopId, params.page, params.search, params.category, params.aisle, params.stockStatus]);
 
   // Debounced fetch for search
   const debouncedFetch = useCallback((fetchParams: FetchParams) => {
@@ -127,7 +129,7 @@ const useFetchProductsAtShop = (
     } else {
       fetchProducts(params);
     }
-  }, [shopId, refreshTrigger, params.page, params.search, params.category, params.aisle]);
+  }, [shopId, refreshTrigger, params.page, params.search, params.category, params.aisle, params.stockStatus]);
 
   return { 
     products, 

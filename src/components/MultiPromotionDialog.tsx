@@ -250,6 +250,38 @@ export const MultiPromotionDialog = ({
     }
   };
 
+  const handleApplyPromotion = async (promo: Promotion) => {
+    try {
+      const authToken = localStorage.getItem("auth_token");
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/product-promotions/${shopId}/${productId}/apply`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken && { Authorization: `Bearer ${authToken}` }),
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            promotionPrice: promo.promotionPrice,
+            endDate: promo.endDate
+          })
+        }
+      );
+
+      if (response.ok) {
+        toast.success("Promotion applied as current offer");
+        fetchPromotions();
+        onPromotionsUpdated?.();
+      } else {
+        toast.error("Failed to apply promotion");
+      }
+    } catch (error) {
+      console.error("Error applying promotion:", error);
+      toast.error("Failed to apply promotion");
+    }
+  };
+
   // Find the currently active lowest price
   const activePromotions = promotions.filter(isPromotionActive);
   const currentBestPromotion = activePromotions.length > 0
@@ -346,14 +378,26 @@ export const MultiPromotionDialog = ({
                           <p className="text-sm text-gray-500 mt-1">{promo.description}</p>
                         )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => promo.id && handleDeletePromotion(promo.id)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        {!isLowest && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleApplyPromotion(promo)}
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50 text-xs"
+                          >
+                            Apply
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => promo.id && handleDeletePromotion(promo.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 );

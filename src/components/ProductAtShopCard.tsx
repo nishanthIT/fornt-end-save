@@ -4,11 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, Tag, Clock, PoundSterling, Pencil, Upload, X, Tags } from "lucide-react";
+import { Calendar, Tag, Clock, PoundSterling, Pencil, Upload, X, Tags, Barcode, Check, PackageX, Trash2 } from "lucide-react";
 import { getImageUrl } from "@/utils/imageUtils";
 import { toast } from "sonner";
 import { CategorySelect } from "@/components/CategorySelect";
 import { MultiPromotionDialog } from "@/components/MultiPromotionDialog";
+import { OptimizedScanner } from "@/components/OptimizedScanner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ProductAtShopCardProps {
   productId: string;
@@ -26,9 +28,12 @@ interface ProductAtShopCardProps {
   offerExpiryDate?: string;
   aiel: string;
   rrp: number;
+  outOfStock?: boolean;
   onPriceUpdate: (productId: string, newPrice: number) => void;
   onOfferUpdate: (productId: string, regularPrice: number, offerPrice: number | null, offerExpiryDate: string | null) => void;
   onProductUpdated?: () => void;
+  onOutOfStockToggle?: (productId: string, outOfStock: boolean) => void;
+  onRemove?: (productId: string) => void;
 }
 
 // Helper function to calculate days remaining
@@ -87,10 +92,16 @@ export const ProductAtShopCard = ({
   offerExpiryDate,
   aiel,
   rrp,
+  outOfStock = false,
   onPriceUpdate,
   onOfferUpdate,
   onProductUpdated,
+  onOutOfStockToggle,
+  onRemove,
 }: ProductAtShopCardProps) => {
+  const { user } = useAuth();
+  const employeeId = user?.id;
+  
   const [isEditing, setIsEditing] = useState(false);
   const [editPrice, setEditPrice] = useState(price.toString());
   const [editOfferPrice, setEditOfferPrice] = useState(offerPrice?.toString() || "");
@@ -113,12 +124,22 @@ export const ProductAtShopCard = ({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Barcode scanner states
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [showCaseBarcodeScanner, setShowCaseBarcodeScanner] = useState(false);
+  
+  // Direct editing states for aisle and price (always visible)
+  const [inlineAisle, setInlineAisle] = useState(aiel || "");
+  const [inlinePrice, setInlinePrice] = useState(price.toString());
+  
   // Multi-promotion dialog state
   const [showMultiPromotionDialog, setShowMultiPromotionDialog] = useState(false);
 
   const currentPrice = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date() ? offerPrice : price;
   const hasActiveOffer = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date();
   const daysRemaining = hasActiveOffer ? getDaysRemaining(offerExpiryDate!) : 0;
+  // Orange styling only shows when offer expires in 1 day or less
+  const isUrgentOffer = hasActiveOffer && daysRemaining <= 1;
 
   // Update component state when props change (after data refresh)
   useEffect(() => {
@@ -127,7 +148,52 @@ export const ProductAtShopCard = ({
     setEditOfferExpiryDate(
       offerExpiryDate ? new Date(offerExpiryDate).toISOString().slice(0, 10) : ""
     );
-  }, [price, offerPrice, offerExpiryDate]);
+    setInlineAisle(aiel || "");
+    setInlinePrice(price.toString());
+  }, [price, offerPrice, offerExpiryDate, aiel]);
+
+  // Handle inline save for aisle and price
+  const handleInlineSave = async () => {
+    const newPrice = parseFloat(inlinePrice);
+    if (isNaN(newPrice) || newPrice <= 0) {
+      toast.error("Please enter a valid price");
+      return;
+    }
+    
+    try {
+      const authToken = localStorage.getItem("auth_token");
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${shopId}/updateProductPrice`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken && { Authorization: `Bearer ${authToken}` }),
+          },
+          body: JSON.stringify({
+            productId,
+            price: newPrice,
+            aisle: inlineAisle || null,
+            employeeId,
+          }),
+          credentials: 'include'
+        }
+      );
+      
+      if (response.ok) {
+        toast.success("Updated successfully!");
+        if (onProductUpdated) {
+          onProductUpdated();
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to update");
+      }
+    } catch (error) {
+      console.error("Error updating:", error);
+      toast.error("Error updating product");
+    }
+  };
 
   const handleSave = () => {
     const newPrice = parseFloat(editPrice);
@@ -360,155 +426,158 @@ export const ProductAtShopCard = ({
   };
 
   return (
-    <Card className={`product-card w-full ${hasActiveOffer ? 'ring-2 ring-orange-400 bg-orange-50' : ''}`}>
-      <CardContent className="p-3 sm:p-4">
+    <Card className={`product-card w-full relative ${outOfStock ? 'ring-2 ring-gray-400 bg-gray-100 opacity-75' : isUrgentOffer ? 'ring-2 ring-orange-400 bg-orange-50' : ''}`}>
+      {/* Out of Stock Badge - Top Left */}
+      {outOfStock && (
+        <div className="absolute top-0 left-0 px-2 py-1 rounded-br-lg bg-gray-600 text-white">
+          <span className="text-xs font-bold">Out of Stock</span>
+        </div>
+      )}
+      {/* Price Badge - Top Right Corner */}
+      <div className={`absolute top-0 right-0 px-2 py-1 rounded-bl-lg ${hasActiveOffer ? 'bg-orange-500 text-white' : 'bg-green-600 text-white'}`}>
+        <span className="text-sm font-bold">£{currentPrice.toFixed(2)}</span>
         {hasActiveOffer && (
-          <div className="flex items-center gap-1.5 mb-2 text-orange-600">
-            <Tag className="h-3 w-3 flex-shrink-0" />
-            <span className="text-xs font-medium">🔥 OFFER</span>
-            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-              {daysRemaining > 0 ? `${daysRemaining}d left` : 'Today'}
-            </Badge>
-          </div>
+          <span className="text-[9px] ml-1">({daysRemaining > 0 ? `${daysRemaining}d` : '!'})</span>
         )}
-        <div className="flex items-start gap-2">
-          {/* Product Image */}
+      </div>
+      
+      <CardContent className={`p-3 ${outOfStock ? 'pt-8' : 'pt-2'}`}>
+        {/* Row 1: Product Info + Action Icons */}
+        <div className="flex items-center gap-2">
           <img
             src={getImageUrl(img)}
             alt={title}
-            className="w-11 h-11 sm:w-14 sm:h-14 object-cover rounded-md flex-shrink-0"
+            className={`w-12 h-12 object-cover rounded flex-shrink-0 ${outOfStock ? 'grayscale' : ''}`}
             loading="lazy"
           />
-          
-          {/* Product Info */}
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm sm:text-base font-semibold truncate pr-1">{title}</h3>
-            <div className="flex flex-wrap gap-x-1.5 gap-y-0 mt-0.5 text-[10px] sm:text-xs text-gray-600">
-              <span>Case:{caseSize}</span>
-              <span>Pkt:{packetSize}</span>
-              {aiel && <span>Aisle:{aiel}</span>}
-            </div>
-            {/* Barcodes inline */}
-            <div className="flex flex-wrap gap-1 mt-0.5">
-              <span className="text-[9px] text-gray-500">{barcode}</span>
-              {caseBarcode && <span className="text-[9px] text-gray-400">| {caseBarcode}</span>}
+          <div className="flex-1 min-w-0 pr-12">
+            <h3 className="text-sm font-semibold line-clamp-2 leading-tight">{title}</h3>
+            <div className="text-[10px] text-gray-500">
+              Case: {caseSize} | Pkt: {packetSize} | {barcode}
             </div>
           </div>
-          
-          {/* Price + Edit - Right column */}
-          {!isEditing && (
-            <div className="text-right flex-shrink-0 flex flex-col items-end">
-              <span className={`text-base sm:text-lg font-bold ${hasActiveOffer ? 'text-orange-600' : 'text-green-600'}`}>
-                £{currentPrice.toFixed(2)}
-              </span>
-              {hasActiveOffer && (
-                <div className="text-[9px] text-gray-500 line-through">
-                  Was: £{price.toFixed(2)}
-                </div>
-              )}
-              {rrp && (
-                <div className="text-[9px] text-gray-400">
-                  RRP: £{rrp.toFixed(2)}
-                </div>
-              )}
-              <div className="flex gap-1 mt-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setEditProductTitle(title);
-                    setEditProductCaseSize(caseSize);
-                    setEditProductPacketSize(packetSize);
-                    setEditProductRetailSize(retailSize);
-                    setEditProductRrp(rrp.toString());
-                    setEditProductBarcode(barcode);
-                    setEditProductCaseBarcode(caseBarcode || "");
-                    setSelectedImage(null);
-                    setImagePreview(null);
-                    setShowEditProductDialog(true);
-                  }}
-                  className="h-7 w-7 p-0"
-                  title="Edit Product"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowMultiPromotionDialog(true)}
-                  className="h-7 w-7 p-0"
-                  title="Manage Promotions"
-                >
-                  <Tags className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={hasActiveOffer ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setIsEditing(true)}
-                  className={`h-5 px-2 text-[10px] ${hasActiveOffer ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
-                >
-                  Edit
-                </Button>
-              </div>
-            </div>
-          )}
+          {/* Action Icons */}
+          <div className="flex gap-1 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setEditProductTitle(title);
+                setEditProductCaseSize(caseSize);
+                setEditProductPacketSize(packetSize);
+                setEditProductRetailSize(retailSize);
+                setEditProductRrp(rrp.toString());
+                setEditProductBarcode(barcode);
+                setEditProductCaseBarcode(caseBarcode || "");
+                setEditProductCategory(category || "");
+                setSelectedImage(null);
+                setImagePreview(null);
+                setShowEditProductDialog(true);
+              }}
+              className="h-8 w-8 p-0"
+              title="Edit Product"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowMultiPromotionDialog(true)}
+              className="h-8 w-8 p-0"
+              title="Promotions"
+            >
+              <Tags className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={isUrgentOffer ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setIsEditing(true)}
+              className={`h-8 w-8 p-0 ${isUrgentOffer ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
+              title="Set Offer"
+            >
+              <Tag className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        {/* Edit Form - Shows when editing */}
-        {isEditing && (
-          <div className="space-y-2 w-full mt-3">
-            <div>
-              <label className="text-xs text-gray-600">Regular Price (e.g. 456 = £4.56)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
-                <Input
-                  type="text"
-                  value={editPrice}
-                  onChange={(e) => handlePriceInputChange(e.target.value, setEditPrice)}
-                  className="w-full pl-7"
-                  placeholder="e.g. 456 = £4.56"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="text-xs text-gray-600">
-                Offer Price {hasActiveOffer ? '- Currently Active' : '- Optional'}
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
-                <Input
-                  type="text"
-                  value={editOfferPrice}
-                  onChange={(e) => handlePriceInputChange(e.target.value, setEditOfferPrice)}
-                  className={`w-full pl-7 ${hasActiveOffer ? 'border-orange-400 bg-orange-50' : ''}`}
-                  placeholder="e.g. 399 = £3.99"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs text-gray-600">
-                Offer Expires {hasActiveOffer ? '- Currently Active' : ''}
-              </label>
+        {/* Row 2: Quick Edit */}
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t">
+          <div className="flex-1">
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">£</span>
               <Input
-                type="date"
-                value={editOfferExpiryDate}
-                onChange={(e) => setEditOfferExpiryDate(e.target.value)}
-                className={`w-full ${hasActiveOffer ? 'border-orange-400 bg-orange-50' : ''}`}
+                type="text"
+                value={inlinePrice}
+                onChange={(e) => handlePriceInputChange(e.target.value, setInlinePrice)}
+                className="h-8 text-sm pl-6"
+                placeholder="Price"
               />
             </div>
+          </div>
+          <div className="w-16">
+            <Input
+              type="text"
+              value={inlineAisle}
+              onChange={(e) => setInlineAisle(e.target.value)}
+              className="h-8 text-sm text-center"
+              placeholder="Aisle"
+            />
+          </div>
+          <Button size="sm" onClick={handleInlineSave} className="h-8 px-3">
+            <Check className="h-4 w-4" />
+          </Button>
+        </div>
 
-            {hasActiveOffer && (
-              <div className="text-center">
-                <Button
-                  variant="ghost"
-                  size="sm"
+        {/* Offer Edit Form (Expandable) */}
+        {isEditing && (
+          <div className="mt-2 pt-2 border-t space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Regular Price</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">£</span>
+                  <Input
+                    type="text"
+                    value={editPrice}
+                    onChange={(e) => handlePriceInputChange(e.target.value, setEditPrice)}
+                    className="h-9 text-sm pl-7"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Offer Price</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">£</span>
+                  <Input
+                    type="text"
+                    value={editOfferPrice}
+                    onChange={(e) => handlePriceInputChange(e.target.value, setEditOfferPrice)}
+                    className={`h-9 text-sm pl-7 ${isUrgentOffer ? 'border-orange-400' : ''}`}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Expires</label>
+                <Input
+                  type="date"
+                  value={editOfferExpiryDate}
+                  onChange={(e) => setEditOfferExpiryDate(e.target.value)}
+                  className={`h-9 text-sm ${isUrgentOffer ? 'border-orange-400' : ''}`}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleCancel} className="flex-1 h-9">
+                Cancel
+              </Button>
+              {hasActiveOffer && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
                   onClick={() => {
-                    if (window.confirm('Are you sure you want to clear this offer?')) {
+                    if (window.confirm('Clear this offer?')) {
                       setEditOfferPrice("");
                       setEditOfferExpiryDate("");
-                      // Immediately save the changes to clear the offer
                       const newPrice = parseFloat(editPrice);
                       if (!isNaN(newPrice) && newPrice > 0) {
                         onOfferUpdate(productId, newPrice, null, null);
@@ -516,28 +585,13 @@ export const ProductAtShopCard = ({
                       }
                     }
                   }}
-                  className="text-red-600 hover:text-red-800 text-xs"
+                  className="h-9 text-red-600 hover:text-red-700"
                 >
                   Clear Offer
                 </Button>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCancel}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSave}
-                className="flex-1"
-              >
-                Save
+              )}
+              <Button size="sm" onClick={handleSave} className="flex-1 h-9">
+                Save Offer
               </Button>
             </div>
           </div>
@@ -546,7 +600,7 @@ export const ProductAtShopCard = ({
 
       {/* Edit Product Dialog */}
       <Dialog open={showEditProductDialog} onOpenChange={setShowEditProductDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Product</DialogTitle>
           </DialogHeader>
@@ -596,23 +650,47 @@ export const ProductAtShopCard = ({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium">Barcode</label>
-                <Input
-                  value={editProductBarcode}
-                  onChange={(e) => setEditProductBarcode(e.target.value)}
-                  placeholder="Barcode"
-                />
+                <div className="relative">
+                  <Input
+                    value={editProductBarcode}
+                    onChange={(e) => setEditProductBarcode(e.target.value)}
+                    placeholder="Barcode"
+                    className="pr-10"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowBarcodeScanner(true)}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                    title="Scan Barcode"
+                  >
+                    <Barcode className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium">Case Barcode</label>
-                <Input
-                  value={editProductCaseBarcode}
-                  onChange={(e) => setEditProductCaseBarcode(e.target.value)}
-                  placeholder="Case barcode"
-                />
+                <div className="relative">
+                  <Input
+                    value={editProductCaseBarcode}
+                    onChange={(e) => setEditProductCaseBarcode(e.target.value)}
+                    placeholder="Case barcode"
+                    className="pr-10"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowCaseBarcodeScanner(true)}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                    title="Scan Case Barcode"
+                  >
+                    <Barcode className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
 
-            {/* Category */}
+            {/* Category - Scrollable */}
             <div>
               <label className="text-sm font-medium">Category</label>
               <CategorySelect
@@ -687,6 +765,59 @@ export const ProductAtShopCard = ({
                 {isEditingProduct ? "Saving..." : "Save"}
               </Button>
             </div>
+            
+            {/* Stock and Remove Actions */}
+            <div className="flex gap-2 pt-4 border-t mt-4">
+              <Button
+                variant={outOfStock ? "default" : "outline"}
+                onClick={async () => {
+                  try {
+                    const auth_token = localStorage.getItem('auth_token');
+                    const response = await fetch(
+                      `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${shopId}/product/${productId}/stock`,
+                      {
+                        method: "PUT",
+                        headers: {
+                          "Content-Type": "application/json",
+                          ...(auth_token && { Authorization: `Bearer ${auth_token}` }),
+                        },
+                        body: JSON.stringify({ outOfStock: !outOfStock }),
+                        credentials: 'include'
+                      }
+                    );
+                    
+                    if (response.ok) {
+                      toast.success(outOfStock ? "Product marked as in stock" : "Product marked as out of stock");
+                      setShowEditProductDialog(false);
+                      onProductUpdated?.();
+                    } else {
+                      const data = await response.json();
+                      toast.error(data.error || "Failed to update stock status");
+                    }
+                  } catch (error) {
+                    console.error("Error updating stock status:", error);
+                    toast.error("Error updating stock status");
+                  }
+                }}
+                className={`flex-1 ${outOfStock ? 'bg-gray-500 hover:bg-gray-600' : ''}`}
+              >
+                <PackageX className="h-4 w-4 mr-2" />
+                {outOfStock ? "Mark In Stock" : "Mark Out of Stock"}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (confirm(`Remove "${title}" from this shop? This cannot be undone.`)) {
+                    onRemove?.(productId);
+                    setShowEditProductDialog(false);
+                  }
+                }}
+                className="flex-1"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Remove from Shop
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -701,6 +832,46 @@ export const ProductAtShopCard = ({
         regularPrice={price}
         onPromotionsUpdated={onProductUpdated}
       />
+
+      {/* Barcode Scanner Dialog */}
+      <Dialog open={showBarcodeScanner} onOpenChange={setShowBarcodeScanner}>
+        <DialogContent className="w-[95vw] max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle>Scan Product Barcode</DialogTitle>
+          </DialogHeader>
+          <div className="w-full max-w-full overflow-hidden">
+            <OptimizedScanner
+              width="100%"
+              height={250}
+              onScan={(result) => {
+                setEditProductBarcode(result);
+                setShowBarcodeScanner(false);
+                toast.success("Barcode scanned!");
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Case Barcode Scanner Dialog */}
+      <Dialog open={showCaseBarcodeScanner} onOpenChange={setShowCaseBarcodeScanner}>
+        <DialogContent className="w-[95vw] max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle>Scan Case Barcode</DialogTitle>
+          </DialogHeader>
+          <div className="w-full max-w-full overflow-hidden">
+            <OptimizedScanner
+              width="100%"
+              height={250}
+              onScan={(result) => {
+                setEditProductCaseBarcode(result);
+                setShowCaseBarcodeScanner(false);
+                toast.success("Case barcode scanned!");
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

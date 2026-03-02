@@ -158,7 +158,7 @@ export function CategorySelect({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -171,14 +171,27 @@ export function CategorySelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full min-w-[200px] p-0" align="start">
+      <PopoverContent 
+        className="w-full min-w-[200px] p-0" 
+        align="start" 
+        side="bottom" 
+        sideOffset={4}
+        style={{ maxHeight: '50vh' }}
+      >
         <Command shouldFilter={false}>
           <CommandInput 
             placeholder="Search category..." 
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
-          <CommandList>
+          <CommandList 
+            className="overflow-y-auto overscroll-contain"
+            style={{ 
+              maxHeight: '40vh', 
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y'
+            }}
+          >
             {loading ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
                 Loading categories...

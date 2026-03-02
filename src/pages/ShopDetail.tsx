@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Store, Phone, MapPin, Plus, Save, PlusCircle, Barcode, Search, Camera, Upload, X } from "lucide-react";
+import { Store, Phone, MapPin, Plus, Save, PlusCircle, Barcode, Search, Camera, Upload, X, Gift } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductCardshop } from "@/components/ProductCardShop";
 import { ProductAtShopCard } from "@/components/ProductAtShopCard";
@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { getImageUrl } from "@/utils/imageUtils";
 import { CategorySelect } from "@/components/CategorySelect";
+import { BundlePromotionDialog } from "@/components/BundlePromotionDialog";
 
 const ShopDetail = () => {
   const { id } = useParams();
@@ -58,6 +59,7 @@ const ShopDetail = () => {
   // Filter states for Available Products tab
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [filterAisle, setFilterAisle] = useState<string>("");
+  const [filterStockStatus, setFilterStockStatus] = useState<string>("");
   const [availableProductsSearch, setAvailableProductsSearch] = useState<string>("");
   const [availableProductsPage, setAvailableProductsPage] = useState<number>(1);
   
@@ -85,6 +87,9 @@ const ShopDetail = () => {
   
   // Force refresh state
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // Bundle promotion dialog state
+  const [showBundlePromotionDialog, setShowBundlePromotionDialog] = useState(false);
 
   // Helper function to format price input (456 -> 4.56, 45 -> 0.45, 1 -> 0.01)
   const formatPriceInput = (value: string): string => {
@@ -181,7 +186,8 @@ const ShopDetail = () => {
     page: availableProductsPage,
     search: availableProductsSearch,
     category: filterCategory,
-    aisle: filterAisle
+    aisle: filterAisle,
+    stockStatus: filterStockStatus
   });
   const { shop, loading: shopLoading, error: shopError } = useFetchShopById(id);
 
@@ -564,10 +570,68 @@ const ShopDetail = () => {
     handleSavePrice(productId, regularPrice, offerPrice, offerExpiryDate);
   };
 
+  // Handle out of stock toggle
+  const handleOutOfStockToggle = async (productId: string, outOfStock: boolean) => {
+    try {
+      const auth_token = localStorage.getItem('auth_token');
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${id}/product/${productId}/stock`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(auth_token && { Authorization: `Bearer ${auth_token}` }),
+          },
+          body: JSON.stringify({ outOfStock }),
+          credentials: 'include'
+        }
+      );
+      
+      if (response.ok) {
+        toast.success(outOfStock ? "Product marked as out of stock" : "Product marked as in stock");
+        refetchProductsAtShop();
+      } else {
+        toast.error("Failed to update stock status");
+      }
+    } catch (error) {
+      console.error("Error updating stock status:", error);
+      toast.error("Error updating stock status");
+    }
+  };
+
+  // Handle remove product from shop
+  const handleRemoveProduct = async (productId: string) => {
+    try {
+      const auth_token = localStorage.getItem('auth_token');
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${id}/product`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            ...(auth_token && { Authorization: `Bearer ${auth_token}` }),
+          },
+          body: JSON.stringify({ productId, employeeId: user?.id }),
+          credentials: 'include'
+        }
+      );
+      
+      if (response.ok) {
+        toast.success("Product removed from shop");
+        refetchProductsAtShop();
+      } else {
+        toast.error("Failed to remove product from shop");
+      }
+    } catch (error) {
+      console.error("Error removing product:", error);
+      toast.error("Error removing product");
+    }
+  };
+
   // Reset pagination when filters change
   useEffect(() => {
     setAvailableProductsPage(1);
-  }, [availableProductsSearch, filterCategory, filterAisle]);
+  }, [availableProductsSearch, filterCategory, filterAisle, filterStockStatus]);
 
   // Products are already filtered by API, no need for client-side filtering
   // Keep this for backward compatibility with other UI parts that might use it
@@ -584,8 +648,21 @@ const ShopDetail = () => {
               <h1 className="text-xl sm:text-2xl font-bold truncate">{shop?.name || "Unknown Shop"}</h1>
             </div>
 
-            {/* Add New Product Dialog */}
-            <Dialog>
+            <div className="flex gap-2 flex-wrap">
+              {/* Bundle Promotions Button */}
+              <Button 
+                size="sm" 
+                variant="outline"
+                className="flex-shrink-0" 
+                onClick={() => setShowBundlePromotionDialog(true)}
+              >
+                <Gift className="mr-1 sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Bundle Offers</span>
+                <span className="sm:hidden">Bundles</span>
+              </Button>
+
+              {/* Add New Product Dialog */}
+              <Dialog>
               <DialogTrigger asChild>
                 <Button size="sm" className="w-full xs:w-auto flex-shrink-0" data-trigger="add-new-product">
                   <PlusCircle className="mr-1 sm:mr-2 h-4 w-4" />
@@ -764,6 +841,7 @@ const ShopDetail = () => {
                 </div>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-muted-foreground text-sm sm:text-base">
@@ -966,7 +1044,7 @@ const ShopDetail = () => {
               </Button>
             </div>
 
-            {/* Filter Options - Category and Aisle */}
+            {/* Filter Options - Category, Aisle, and Stock Status */}
             <div className="flex flex-col sm:flex-row gap-2">
               {/* Category Filter */}
               <div className="flex-1">
@@ -996,14 +1074,28 @@ const ShopDetail = () => {
                 </select>
               </div>
 
+              {/* Stock Status Filter */}
+              <div className="flex-1">
+                <select
+                  value={filterStockStatus}
+                  onChange={(e) => setFilterStockStatus(e.target.value)}
+                  className="w-full h-9 px-3 py-1.5 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <option value="">All Stock</option>
+                  <option value="in-stock">In Stock</option>
+                  <option value="out-of-stock">Out of Stock</option>
+                </select>
+              </div>
+
               {/* Clear Filters Button - show only when filters are active */}
-              {(filterCategory || filterAisle || availableProductsSearch) && (
+              {(filterCategory || filterAisle || filterStockStatus || availableProductsSearch) && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
                     setFilterCategory("");
                     setFilterAisle("");
+                    setFilterStockStatus("");
                     setAvailableProductsSearch("");
                   }}
                   className="flex-shrink-0 text-xs sm:text-sm"
@@ -1015,11 +1107,12 @@ const ShopDetail = () => {
             </div>
 
             {/* Active Filters Summary */}
-            {(filterCategory || filterAisle || availableProductsSearch) && (
+            {(filterCategory || filterAisle || filterStockStatus || availableProductsSearch) && (
               <div className="text-xs sm:text-sm text-muted-foreground">
                 Showing {filteredProducts.length} of {productsAtShopPagination?.total || 0} products
                 {filterCategory && <span className="ml-1">in <strong>{filterCategory}</strong></span>}
                 {filterAisle && <span className="ml-1">in <strong>Aisle {filterAisle}</strong></span>}
+                {filterStockStatus && <span className="ml-1">(<strong>{filterStockStatus === 'out-of-stock' ? 'Out of Stock' : 'In Stock'}</strong>)</span>}
                 {availableProductsSearch && <span className="ml-1">matching <strong>"{availableProductsSearch}"</strong></span>}
               </div>
             )}
@@ -1074,13 +1167,16 @@ const ShopDetail = () => {
                     offerExpiryDate={product.offerExpiryDate}
                     aiel={product.aiel}
                     rrp={Number(product.rrp)}
+                    outOfStock={product.outOfStock || false}
                     onPriceUpdate={handlePriceUpdate}
                     onOfferUpdate={handleOfferUpdate}
                     onProductUpdated={refetchProductsAtShop}
+                    onOutOfStockToggle={handleOutOfStockToggle}
+                    onRemove={handleRemoveProduct}
                   />
                 ))
               ) : (
-                <div>No products found. {availableProductsSearch || filterCategory || filterAisle ? "Try adjusting your search or filters." : "No products available in this shop yet."}</div>
+                <div>No products found. {availableProductsSearch || filterCategory || filterAisle || filterStockStatus ? "Try adjusting your search or filters." : "No products available in this shop yet."}</div>
               )}
             </div>
           )}
@@ -1371,6 +1467,16 @@ const ShopDetail = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Bundle Promotion Dialog */}
+      <BundlePromotionDialog
+        open={showBundlePromotionDialog}
+        onOpenChange={setShowBundlePromotionDialog}
+        shopId={id || ""}
+        onPromotionCreated={() => {
+          // Optionally refresh products if needed
+        }}
+      />
     </div>
   );
 };

@@ -2,7 +2,15 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 
-const useFetchProducts = (searchQuery, filters = {}, page = 1, limit = 10) => {
+interface Filters {
+  withoutBarcode?: boolean;
+  withoutCaseBarcode?: boolean;
+  withoutRrp?: boolean;
+  withoutImage?: boolean;
+  category?: string;
+}
+
+const useFetchProducts = (searchQuery: string, filters: Filters = {}, page = 1, limit = 10) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -56,6 +64,9 @@ const useFetchProducts = (searchQuery, filters = {}, page = 1, limit = 10) => {
         Object.entries(filters).forEach(([key, value]) => {
           if (value === true) {
             params.append(key, 'true');
+          } else if (typeof value === 'string' && value.trim()) {
+            // For string filters like category
+            params.append(key, value.trim());
           }
         });
         

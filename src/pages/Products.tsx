@@ -35,7 +35,11 @@ const Products = () => {
     withoutCaseBarcode: searchParams.get('withoutCaseBarcode') === 'true',
     withoutRrp: searchParams.get('withoutRrp') === 'true',
     withoutImage: searchParams.get('withoutImage') === 'true',
+    category: searchParams.get('category') || "",
   });
+  
+  // Available categories for filter dropdown
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   
   const [currentPage, setCurrentPage] = useState(
     parseInt(searchParams.get('page') || '1', 10)
@@ -136,11 +140,43 @@ const Products = () => {
     
     // Add filters to URL
     Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.set(key, 'true');
+      if (value === true) {
+        params.set(key, 'true');
+      } else if (typeof value === 'string' && value.trim()) {
+        params.set(key, value.trim());
+      }
     });
 
     setSearchParams(params);
   }, [searchQuery, filters, currentPage]);
+
+  // Fetch available categories for filter dropdown
+  useEffect(() => {
+    const fetchProductFilters = async () => {
+      try {
+        const auth_token = localStorage.getItem('auth_token');
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/productFilters`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(auth_token && { Authorization: `Bearer ${auth_token}` }),
+          },
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.categories) {
+            setAvailableCategories(data.categories);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch product filters:", error);
+      }
+    };
+    
+    fetchProductFilters();
+  }, []);
 
   // Updated hook to use filters and pagination
   const { products, loading, error, pagination, refetch } = useFetchProducts(
@@ -150,11 +186,14 @@ const Products = () => {
     itemsPerPage
   );
 
-  // Handle scanning for navigation
+  // Handle scanning for navigation - now searches DB and shows results
   const handleScanForNavigation = (err: any, result: any) => {
     if (result) {
       setIsScannerOpen(false);
-      navigate(`/product/${result.text}`);
+      // Set the barcode as the search query to search the database
+      setSearchQuery(result.text);
+      setCurrentPage(1); // Reset to first page
+      toast.info(`Searching for barcode: ${result.text}`);
     }
   };
 
@@ -195,13 +234,18 @@ const Products = () => {
       withoutCaseBarcode: false,
       withoutRrp: false,
       withoutImage: false,
+      category: "",
     });
     setCurrentPage(1); // Reset to first page
     setSearchQuery(''); // Clear search query
   };
 
-  // Calculate active filters count
-  const activeFiltersCount = Object.values(filters).filter(Boolean).length;
+  // Calculate active filters count (count non-empty filters)
+  const activeFiltersCount = Object.values(filters).filter(value => {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') return value.trim() !== '';
+    return false;
+  }).length;
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -574,6 +618,9 @@ const Products = () => {
             {filters.withoutImage && (
               <span className="bg-primary/10 text-primary px-2 py-1 rounded-md">Without image</span>
             )}
+            {filters.category && (
+              <span className="bg-primary/10 text-primary px-2 py-1 rounded-md">Category: {filters.category}</span>
+            )}
             <Button variant="ghost" size="sm" onClick={clearFilters} className="ml-auto">
               Clear all
             </Button>
@@ -763,6 +810,23 @@ const Products = () => {
                 >
                   Products without images
                 </label>
+              </div>
+              
+              {/* Category Filter Dropdown */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">
+                  Category
+                </label>
+                <select
+                  value={filters.category}
+                  onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full h-9 px-3 py-1.5 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <option value="">All Categories</option>
+                  {availableCategories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
