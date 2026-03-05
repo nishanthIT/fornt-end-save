@@ -34,16 +34,20 @@ const useFetchProductsAtShop = (
   // Use ref for debouncing
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchProducts = useCallback(async (fetchParams?: FetchParams) => {
+  const fetchProducts = useCallback(async (fetchParams?: FetchParams, options?: { silent?: boolean }) => {
     if (!shopId) {
       setLoading(false);
       return;
     }
 
     const currentParams = fetchParams || params;
+    const silent = options?.silent ?? false;
     
     try {
-      setLoading(true);
+      // Only show loading state if not silent (to preserve scroll position on refetch)
+      if (!silent) {
+        setLoading(true);
+      }
       const auth_token = localStorage.getItem('auth_token');
       
       // Build query parameters
@@ -131,12 +135,18 @@ const useFetchProductsAtShop = (
     }
   }, [shopId, refreshTrigger, params.page, params.search, params.category, params.aisle, params.stockStatus]);
 
+  // Silent refetch that preserves scroll position (doesn't show loading state)
+  const silentRefetch = useCallback((fetchParams?: FetchParams) => {
+    return fetchProducts(fetchParams, { silent: true });
+  }, [fetchProducts]);
+
   return { 
     products, 
     loading, 
     error, 
     pagination,
-    refetch: fetchProducts 
+    refetch: fetchProducts,
+    silentRefetch
   };
 };
 

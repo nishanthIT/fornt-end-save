@@ -182,9 +182,8 @@ export const ProductAtShopCard = ({
       
       if (response.ok) {
         toast.success("Updated successfully!");
-        if (onProductUpdated) {
-          onProductUpdated();
-        }
+        // Don't call onProductUpdated to avoid refetch - the card's internal state 
+        // is already updated and the data is saved on the backend
       } else {
         const error = await response.json();
         toast.error(error.error || "Failed to update");
@@ -770,34 +769,10 @@ export const ProductAtShopCard = ({
             <div className="flex gap-2 pt-4 border-t mt-4">
               <Button
                 variant={outOfStock ? "default" : "outline"}
-                onClick={async () => {
-                  try {
-                    const auth_token = localStorage.getItem('auth_token');
-                    const response = await fetch(
-                      `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${shopId}/product/${productId}/stock`,
-                      {
-                        method: "PUT",
-                        headers: {
-                          "Content-Type": "application/json",
-                          ...(auth_token && { Authorization: `Bearer ${auth_token}` }),
-                        },
-                        body: JSON.stringify({ outOfStock: !outOfStock }),
-                        credentials: 'include'
-                      }
-                    );
-                    
-                    if (response.ok) {
-                      toast.success(outOfStock ? "Product marked as in stock" : "Product marked as out of stock");
-                      setShowEditProductDialog(false);
-                      onProductUpdated?.();
-                    } else {
-                      const data = await response.json();
-                      toast.error(data.error || "Failed to update stock status");
-                    }
-                  } catch (error) {
-                    console.error("Error updating stock status:", error);
-                    toast.error("Error updating stock status");
-                  }
+                onClick={() => {
+                  // Use the parent's handler which does local update
+                  onOutOfStockToggle?.(productId, !outOfStock);
+                  setShowEditProductDialog(false);
                 }}
                 className={`flex-1 ${outOfStock ? 'bg-gray-500 hover:bg-gray-600' : ''}`}
               >

@@ -4,7 +4,7 @@
 
 
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Store, Phone, MapPin, Plus, Save, PlusCircle, Barcode, Search, Camera, Upload, X, Gift } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
@@ -90,6 +90,44 @@ const ShopDetail = () => {
   
   // Bundle promotion dialog state
   const [showBundlePromotionDialog, setShowBundlePromotionDialog] = useState(false);
+
+  // Ref to store scroll position for restoration after product updates
+  const savedScrollPositionRef = useRef<number | null>(null);
+  // Flag to indicate we're doing a product update (not initial load)
+  const isUpdatingRef = useRef<boolean>(false);
+
+  // Save current scroll position before updates
+  const saveScrollPosition = useCallback(() => {
+    savedScrollPositionRef.current = window.scrollY;
+    isUpdatingRef.current = true;
+    console.log('Saved scroll position:', savedScrollPositionRef.current);
+  }, []);
+
+  // Restore scroll position after updates - try multiple times to ensure it works
+  const restoreScrollPosition = useCallback(() => {
+    if (savedScrollPositionRef.current !== null && isUpdatingRef.current) {
+      const targetScroll = savedScrollPositionRef.current;
+      console.log('Restoring scroll position to:', targetScroll);
+      
+      // Try restoring multiple times to handle async DOM updates
+      const restore = () => {
+        window.scrollTo(0, targetScroll);
+      };
+      
+      // Immediate restore
+      restore();
+      // After paint
+      requestAnimationFrame(restore);
+      // After a short delay (for any async rendering)
+      setTimeout(restore, 50);
+      setTimeout(restore, 100);
+      setTimeout(() => {
+        restore();
+        savedScrollPositionRef.current = null;
+        isUpdatingRef.current = false;
+      }, 200);
+    }
+  }, []);
 
   // Helper function to format price input (456 -> 4.56, 45 -> 0.45, 1 -> 0.01)
   const formatPriceInput = (value: string): string => {
@@ -181,7 +219,8 @@ const ShopDetail = () => {
     loading: productsAtShopLoading, 
     error: productsAtShopError,
     pagination: productsAtShopPagination,
-    refetch: refetchProductsAtShop 
+    refetch: refetchProductsAtShop,
+    silentRefetch: silentRefetchProductsAtShop 
   } = useFetchProductsAtShop(id, refreshTrigger, {
     page: availableProductsPage,
     search: availableProductsSearch,
@@ -193,11 +232,22 @@ const ShopDetail = () => {
 
   const [products, setProducts] = useState([]);
 
+  // Update a single product locally without refetching (preserves scroll position)
+  const updateProductLocally = useCallback((productId: string, updates: Partial<any>) => {
+    setProducts(prevProducts => 
+      prevProducts.map(p => 
+        p.productId === productId ? { ...p, ...updates } : p
+      )
+    );
+  }, []);
+
   useEffect(() => {
     if (productsAtShop && Array.isArray(productsAtShop)) {
       setProducts(productsAtShop);
+      // Restore scroll position after products update (only for refetch scenarios)
+      restoreScrollPosition();
     }
-  }, [productsAtShop]);
+  }, [productsAtShop, restoreScrollPosition]);
 
   // Fetch shop categories and aisles
   useEffect(() => {
@@ -549,9 +599,12 @@ const ShopDetail = () => {
       if (response.ok) {
         const product = products.find(p => p.productId === productId);
         toast.success(`${product?.title || 'Product'} updated successfully`);
-        // Refresh products after price update
-        setRefreshTrigger(prev => prev + 1);
-        await refetchProductsAtShop();
+        // Update product locally to preserve scroll position (no refetch)
+        updateProductLocally(productId, {
+          price: newPrice,
+          offerPrice: offerPrice,
+          offerExpiryDate: offerExpiryDate
+        });
       } else {
         toast.warning(`Error: ${result.error}`);
       }
@@ -589,7 +642,8 @@ const ShopDetail = () => {
       
       if (response.ok) {
         toast.success(outOfStock ? "Product marked as out of stock" : "Product marked as in stock");
-        refetchProductsAtShop();
+        // Update product locally to preserve scroll position
+        updateProductLocally(productId, { outOfStock });
       } else {
         toast.error("Failed to update stock status");
       }
@@ -618,7 +672,7 @@ const ShopDetail = () => {
       
       if (response.ok) {
         toast.success("Product removed from shop");
-        refetchProductsAtShop();
+        silentRefetchProductsAtShop();
       } else {
         toast.error("Failed to remove product from shop");
       }
@@ -1170,7 +1224,12 @@ const ShopDetail = () => {
                     outOfStock={product.outOfStock || false}
                     onPriceUpdate={handlePriceUpdate}
                     onOfferUpdate={handleOfferUpdate}
-                    onProductUpdated={refetchProductsAtShop}
+                    onProductUpdated={() => {
+                      // For complex edits (edit dialog), do background refresh
+                      // with scroll preservation
+                      saveScrollPosition();
+                      silentRefetchProductsAtShop();
+                    }}
                     onOutOfStockToggle={handleOutOfStockToggle}
                     onRemove={handleRemoveProduct}
                   />
