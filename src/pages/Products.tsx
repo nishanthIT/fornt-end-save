@@ -1,11 +1,11 @@
 
 
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ProductCard } from "@/components/ProductCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, PlusCircle, Barcode, Upload, Filter, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Search, PlusCircle, Barcode, Upload, Filter, ChevronLeft, ChevronRight, X, ClipboardCheck } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Dialog,
@@ -77,9 +77,105 @@ const Products = () => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(false);
+  const [pendingProducts, setPendingProducts] = useState<any[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingError, setPendingError] = useState<string | null>(null);
+  const [approvingPendingId, setApprovingPendingId] = useState<string | null>(null);
+  const [isPendingDialogOpen, setIsPendingDialogOpen] = useState(false);
+  const [scannedUnknownBarcode, setScannedUnknownBarcode] = useState<string>("");
+  const [isQuickAddDialogOpen, setIsQuickAddDialogOpen] = useState(false);
+  const [quickProductName, setQuickProductName] = useState<string>("");
+  const [quickRetailSize, setQuickRetailSize] = useState<string>("");
+  const [quickAddLoading, setQuickAddLoading] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  const fetchPendingProducts = useCallback(async () => {
+    setPendingLoading(true);
+    setPendingError(null);
+    try {
+      const authToken = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/products/pending-submissions`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken && { Authorization: `Bearer ${authToken}` }),
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to load pending products (${response.status})`);
+      }
+
+      const data = await response.json();
+      const pendingList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data?.products)
+            ? data.products
+            : Array.isArray(data?.pendingProducts)
+              ? data.pendingProducts
+              : [];
+
+      setPendingProducts(pendingList);
+    } catch (error) {
+      console.error('Error fetching pending products:', error);
+      setPendingProducts([]);
+      setPendingError(error instanceof Error ? error.message : 'Failed to load pending products');
+    } finally {
+      setPendingLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPendingProducts();
+  }, [fetchPendingProducts]);
+
+  useEffect(() => {
+    if (isPendingDialogOpen) {
+      fetchPendingProducts();
+    }
+  }, [isPendingDialogOpen, fetchPendingProducts]);
+
+  const approvePendingProduct = async (productId: string) => {
+    if (approvingPendingId) return;
+    setApprovingPendingId(productId);
+    try {
+      const authToken = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/products/pending-submissions/${productId}/approve`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken && { Authorization: `Bearer ${authToken}` }),
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          category: 'Uncategorized',
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to approve product');
+      }
+
+      toast.success('Product approved and moved to database');
+      // Optimistic UI: remove immediately from pending list
+      setPendingProducts((prev) => prev.filter((item) => item.id !== productId));
+      // Keep data in sync in background
+      fetchPendingProducts();
+      refetch();
+    } catch (error) {
+      console.error('Error approving product:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to approve product');
+    } finally {
+      setApprovingPendingId(null);
+    }
+  };
 
   // Image compression function
   const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.8): Promise<File> => {
@@ -187,13 +283,90 @@ const Products = () => {
   );
 
   // Handle scanning for navigation - now searches DB and shows results
-  const handleScanForNavigation = (err: any, result: any) => {
-    if (result) {
-      setIsScannerOpen(false);
-      // Set the barcode as the search query to search the database
-      setSearchQuery(result.text);
-      setCurrentPage(1); // Reset to first page
-      toast.info(`Searching for barcode: ${result.text}`);
+  const handleScanForNavigation = async (err: any, result: any) => {
+    if (!result?.text) return;
+
+    const scannedBarcode = String(result.text).trim();
+    setIsScannerOpen(false);
+
+    try {
+      const authToken = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/products/barcode/${encodeURIComponent(scannedBarcode)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken && { Authorization: `Bearer ${authToken}` }),
+        },
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        setSearchQuery(scannedBarcode);
+        setCurrentPage(1);
+        setScannedUnknownBarcode("");
+        toast.success(`Product found for barcode: ${scannedBarcode}`);
+        return;
+      }
+
+      if (response.status === 404) {
+        setScannedUnknownBarcode(scannedBarcode);
+        setQuickProductName("");
+        setQuickRetailSize("");
+        setIsQuickAddDialogOpen(true);
+        toast.info(`Barcode not found: ${scannedBarcode}`);
+        return;
+      }
+
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Barcode search failed');
+    } catch (error) {
+      console.error('Error searching scanned barcode:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to search barcode');
+    }
+  };
+
+  const handleQuickAddUnknownProduct = async () => {
+    if (!scannedUnknownBarcode || !quickProductName.trim() || !quickRetailSize.trim()) {
+      toast.error('Please enter name and size');
+      return;
+    }
+
+    setQuickAddLoading(true);
+    try {
+      const authToken = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/products/quick-add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken && { Authorization: `Bearer ${authToken}` }),
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          barcode: scannedUnknownBarcode,
+          title: quickProductName,
+          retailSize: quickRetailSize,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to add product');
+      }
+
+      toast.success('New product added to Unknown Shop and pending review');
+      setIsQuickAddDialogOpen(false);
+      setSearchQuery(scannedUnknownBarcode);
+      setCurrentPage(1);
+      setScannedUnknownBarcode("");
+      setQuickProductName("");
+      setQuickRetailSize("");
+      await fetchPendingProducts();
+      refetch();
+    } catch (error) {
+      console.error('Error quick-adding unknown product:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to add new product');
+    } finally {
+      setQuickAddLoading(false);
     }
   };
 
@@ -415,6 +588,12 @@ const Products = () => {
           </div>
 
           {/* Add Product Modal */}
+          <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setIsPendingDialogOpen(true)}>
+            <ClipboardCheck className="mr-2 h-4 w-4" />
+            New Products ({pendingProducts.length})
+          </Button>
+
           <Dialog>
             <DialogTrigger asChild>
               <Button className="w-full md:w-auto">
@@ -566,6 +745,7 @@ const Products = () => {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         {/* Search Bar with Barcode Scanner and Filter */}
@@ -600,6 +780,16 @@ const Products = () => {
               </span>
             )}
           </Button>
+          {scannedUnknownBarcode && (
+            <Button
+              variant="secondary"
+              onClick={() => setIsQuickAddDialogOpen(true)}
+              className="md:w-auto"
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add New Product
+            </Button>
+          )}
         </div>
 
         {/* Active Filters Summary */}
@@ -838,6 +1028,85 @@ const Products = () => {
               Apply Filters
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPendingDialogOpen} onOpenChange={setIsPendingDialogOpen}>
+        <DialogContent className="w-[95vw] max-w-2xl mx-auto">
+          <DialogHeader>
+            <DialogTitle>New Products From Scanner</DialogTitle>
+            <DialogDescription>
+              These are products users added from barcode scan when not found.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+            {pendingLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
+            {!pendingLoading && pendingError && (
+              <p className="text-sm text-red-600">{pendingError}</p>
+            )}
+            {!pendingLoading && !pendingError && pendingProducts.length === 0 && (
+              <p className="text-sm text-muted-foreground">No pending products.</p>
+            )}
+
+            {pendingProducts.map((product) => (
+                <div key={product.id} className="border rounded-md p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{product.title}</p>
+                    <p className="text-xs text-muted-foreground">Barcode: {product.barcode || 'N/A'}</p>
+                    <p className="text-xs text-muted-foreground">Size: {product.retailSize || 'N/A'}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => approvePendingProduct(product.id)}
+                    disabled={approvingPendingId === product.id}
+                  >
+                    {approvingPendingId === product.id ? 'Adding...' : 'Add To Database'}
+                  </Button>
+                </div>
+              ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isQuickAddDialogOpen} onOpenChange={setIsQuickAddDialogOpen}>
+        <DialogContent className="w-[95vw] max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Product</DialogTitle>
+            <DialogDescription>
+              Barcode was not found. Enter name and size to create it under Unknown Shop.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">Barcode</label>
+              <Input value={scannedUnknownBarcode} readOnly />
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">Product Name</label>
+              <Input
+                placeholder="Enter product name"
+                value={quickProductName}
+                onChange={(e) => setQuickProductName(e.target.value.toUpperCase())}
+                className="uppercase"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">Size</label>
+              <Input
+                placeholder="e.g. 500ML or 1KG"
+                value={quickRetailSize}
+                onChange={(e) => setQuickRetailSize(e.target.value.toUpperCase())}
+                className="uppercase"
+              />
+            </div>
+
+            <Button className="w-full" onClick={handleQuickAddUnknownProduct} disabled={quickAddLoading}>
+              {quickAddLoading ? 'Adding...' : 'Add Product'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
       </div>

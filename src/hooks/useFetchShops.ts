@@ -9,13 +9,14 @@ const useFetchShops = () => {
     const fetchShops = async () => {
       try {
         const authToken = localStorage.getItem("auth_token");
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/getAllshop`,{
+        // Correctly fetch only WHOLESALE shops for the admin dashboard
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/getAllshop?shopType=WHOLESALE`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
             ...(authToken && { Authorization: `Bearer ${authToken}` }),
           },
-           credentials: 'include'
+          credentials: 'include'
         });
         if (!response.ok) {
           throw new Error("Failed to fetch shops");
