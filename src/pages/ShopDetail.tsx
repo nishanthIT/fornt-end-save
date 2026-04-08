@@ -91,6 +91,14 @@ const ShopDetail = () => {
   // Bundle promotion dialog state
   const [showBundlePromotionDialog, setShowBundlePromotionDialog] = useState(false);
 
+  // Bulk selection + bulk price edit state
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [showBulkPriceDialog, setShowBulkPriceDialog] = useState(false);
+  const [bulkEditType, setBulkEditType] = useState<"fixed" | "increase" | "decrease">("fixed");
+  const [bulkEditValue, setBulkEditValue] = useState("");
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+
   // Ref to store scroll position for restoration after product updates
   const savedScrollPositionRef = useRef<number | null>(null);
   // Flag to indicate we're doing a product update (not initial load)
@@ -623,6 +631,142 @@ const ShopDetail = () => {
     handleSavePrice(productId, regularPrice, offerPrice, offerExpiryDate);
   };
 
+  const startSelectionMode = (productId: string) => {
+    setIsSelectionMode(true);
+    setSelectedProductIds((prev) => (prev.includes(productId) ? prev : [...prev, productId]));
+  };
+
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProductIds((prev) =>
+      prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  const cancelSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedProductIds([]);
+    setShowBulkPriceDialog(false);
+  };
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = (products || []).map((product) => product.productId);
+    if (visibleIds.length === 0) return;
+
+    const allVisibleSelected = visibleIds.every((id) => selectedProductIds.includes(id));
+
+    if (allVisibleSelected) {
+      setSelectedProductIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+      return;
+    }
+
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      visibleIds.forEach((id) => next.add(id));
+      return Array.from(next);
+    });
+  };
+
+  const applyBulkPriceUpdates = async () => {
+    if (!id || selectedProductIds.length === 0) {
+      toast.error("Select at least one product");
+      return;
+    }
+
+    const numericValue = Number.parseFloat(bulkEditValue);
+    if (Number.isNaN(numericValue) || numericValue <= 0) {
+      toast.error(bulkEditType === "fixed" ? "Enter a valid new price" : "Enter a valid percentage");
+      return;
+    }
+    if (bulkEditType === "decrease" && numericValue >= 100) {
+      toast.error("Percentage decrease must be less than 100");
+      return;
+    }
+
+    const selectedProducts = (products || []).filter((product) => selectedProductIds.includes(product.productId));
+    if (selectedProducts.length === 0) {
+      toast.error("No selected products found on this page");
+      return;
+    }
+
+    const calculatePrice = (currentPrice: number) => {
+      if (bulkEditType === "fixed") {
+        return Number(numericValue.toFixed(2));
+      }
+      const multiplier = bulkEditType === "increase"
+        ? 1 + numericValue / 100
+        : 1 - numericValue / 100;
+      return Number(Math.max(0.01, currentPrice * multiplier).toFixed(2));
+    };
+
+    setIsBulkUpdating(true);
+    const authToken = localStorage.getItem("auth_token");
+
+    try {
+      const results = await Promise.all(
+        selectedProducts.map(async (product) => {
+          const nextPrice = calculatePrice(Number(product.price));
+          const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${id}/updateProductPrice`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              ...(authToken && { Authorization: `Bearer ${authToken}` }),
+            },
+            body: JSON.stringify({
+              productId: product.productId,
+              price: nextPrice,
+              employeeId,
+            }),
+            credentials: "include",
+          });
+
+          if (!response.ok) {
+            const errorPayload = await response.json().catch(() => ({}));
+            return {
+              ok: false,
+              productId: product.productId,
+              title: product.title,
+              error: errorPayload.error || "Update failed",
+            };
+          }
+
+          return {
+            ok: true,
+            productId: product.productId,
+            nextPrice,
+          };
+        })
+      );
+
+      const successful = results.filter((result) => result.ok) as Array<{ ok: true; productId: string; nextPrice: number }>;
+      const failed = results.filter((result) => !result.ok) as Array<{ ok: false; title: string; error: string }>;
+
+      successful.forEach((item) => {
+        updateProductLocally(item.productId, { price: item.nextPrice });
+      });
+
+      if (successful.length > 0) {
+        toast.success(`Updated ${successful.length} product${successful.length > 1 ? "s" : ""} successfully`);
+      }
+      if (failed.length > 0) {
+        toast.warning(`Failed to update ${failed.length} product${failed.length > 1 ? "s" : ""}`);
+      }
+
+      if (successful.length > 0) {
+        setShowBulkPriceDialog(false);
+        setBulkEditValue("");
+        setSelectedProductIds([]);
+        setIsSelectionMode(false);
+      }
+    } catch (error) {
+      console.error("Bulk price update error:", error);
+      toast.error("Bulk update failed. Please try again.");
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
   // Handle out of stock toggle
   const handleOutOfStockToggle = async (productId: string, outOfStock: boolean) => {
     try {
@@ -690,6 +834,20 @@ const ShopDetail = () => {
   // Products are already filtered by API, no need for client-side filtering
   // Keep this for backward compatibility with other UI parts that might use it
   const filteredProducts = products || [];
+  const allVisibleSelected =
+    filteredProducts.length > 0 &&
+    filteredProducts.every((product) => selectedProductIds.includes(product.productId));
+
+  useEffect(() => {
+    setSelectedProductIds((prev) => {
+      const existing = new Set((products || []).map((product) => product.productId));
+      return prev.filter((id) => existing.has(id));
+    });
+  }, [products]);
+
+  useEffect(() => {
+    cancelSelectionMode();
+  }, [availableProductsPage, availableProductsSearch, filterCategory, filterAisle, filterStockStatus]);
 
   return (
     <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-6">
@@ -1199,6 +1357,35 @@ const ShopDetail = () => {
           
           {productsAtShopLoading && <p>Loading products...</p>}
           {productsAtShopError && <p className="text-red-500">Error loading products: {productsAtShopError}</p>}
+
+          {isSelectionMode ? (
+            <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-medium text-blue-900">
+                  {selectedProductIds.length} item{selectedProductIds.length === 1 ? "" : "s"} selected
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={toggleSelectAllVisible}>
+                    {allVisibleSelected ? "Unselect All" : "Select All"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setShowBulkPriceDialog(true)}
+                    disabled={selectedProductIds.length === 0}
+                  >
+                    Edit Price
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={cancelSelectionMode}>
+                    Cancel Selection
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="mb-3 text-xs text-muted-foreground sm:text-sm">
+              Long press any product card to enable multi-select and bulk price editing.
+            </p>
+          )}
           
           {!productsAtShopLoading && (
             <div className="space-y-2 sm:space-y-4">
@@ -1232,6 +1419,10 @@ const ShopDetail = () => {
                     }}
                     onOutOfStockToggle={handleOutOfStockToggle}
                     onRemove={handleRemoveProduct}
+                    selectionMode={isSelectionMode}
+                    isSelected={selectedProductIds.includes(product.productId)}
+                    onToggleSelect={toggleProductSelection}
+                    onStartSelection={startSelectionMode}
                   />
                 ))
               ) : (
@@ -1303,6 +1494,94 @@ const ShopDetail = () => {
           )}
         </>
       )}
+
+      {/* Bulk Price Edit Dialog */}
+      <Dialog open={showBulkPriceDialog} onOpenChange={setShowBulkPriceDialog}>
+        <DialogContent className="w-[95vw] max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle>Bulk Edit Price</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Apply changes to {selectedProductIds.length} selected item{selectedProductIds.length === 1 ? "" : "s"}.
+            </p>
+
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={bulkEditType === "fixed" ? "default" : "outline"}
+                onClick={() => setBulkEditType("fixed")}
+              >
+                Same Price
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={bulkEditType === "increase" ? "default" : "outline"}
+                onClick={() => setBulkEditType("increase")}
+              >
+                Increase %
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={bulkEditType === "decrease" ? "default" : "outline"}
+                onClick={() => setBulkEditType("decrease")}
+              >
+                Decrease %
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {bulkEditType === "fixed" ? "New Price" : "Percentage"}
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  {bulkEditType === "fixed" ? "£" : "%"}
+                </span>
+                <Input
+                  type={bulkEditType === "fixed" ? "text" : "number"}
+                  inputMode={bulkEditType === "fixed" ? "numeric" : "decimal"}
+                  min="0"
+                  step={bulkEditType === "fixed" ? undefined : "0.1"}
+                  value={bulkEditValue}
+                  onChange={(e) => {
+                    if (bulkEditType === "fixed") {
+                      handlePriceChange(e.target.value, setBulkEditValue);
+                      return;
+                    }
+                    setBulkEditValue(e.target.value);
+                  }}
+                  placeholder={bulkEditType === "fixed" ? "e.g. 2.49" : "e.g. 10"}
+                  className="pl-7"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowBulkPriceDialog(false)}
+                disabled={isBulkUpdating}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={applyBulkPriceUpdates}
+                disabled={isBulkUpdating || selectedProductIds.length === 0}
+              >
+                {isBulkUpdating ? "Updating..." : "Apply Changes"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog for adding existing product with details */}
       <Dialog open={showAddProductDialog} onOpenChange={(open) => {

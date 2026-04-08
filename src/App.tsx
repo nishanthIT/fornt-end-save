@@ -137,6 +137,7 @@ import PriceCorrections from "./pages/PriceCorrections";
 import PromotionManagement from "./pages/PromotionManagement";
 import AdvertisementManagement from "./pages/AdvertisementManagement";
 import NewsManagement from "./pages/NewsManagement";
+import ItemsInUserList from "./pages/ItemsInUserList";
 
 const queryClient = new QueryClient();
 
@@ -188,6 +189,11 @@ const App = () => (
                 <Route path="/employees" element={
                   <ProtectedRoute allowedRoles={["ADMIN"]}>
                     <Employees />
+                  </ProtectedRoute>
+                } />
+                <Route path="/items-in-user-list" element={
+                  <ProtectedRoute allowedRoles={["ADMIN"]}>
+                    <ItemsInUserList />
                   </ProtectedRoute>
                 } />
                 <Route path="/price-corrections" element={

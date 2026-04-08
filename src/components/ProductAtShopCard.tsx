@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar, Tag, Clock, PoundSterling, Pencil, Upload, X, Tags, Barcode, Check, PackageX, Trash2 } from "lucide-react";
 import { getImageUrl } from "@/utils/imageUtils";
@@ -34,6 +35,10 @@ interface ProductAtShopCardProps {
   onProductUpdated?: () => void;
   onOutOfStockToggle?: (productId: string, outOfStock: boolean) => void;
   onRemove?: (productId: string) => void;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (productId: string) => void;
+  onStartSelection?: (productId: string) => void;
 }
 
 // Helper function to calculate days remaining
@@ -98,6 +103,10 @@ export const ProductAtShopCard = ({
   onProductUpdated,
   onOutOfStockToggle,
   onRemove,
+  selectionMode = false,
+  isSelected = false,
+  onToggleSelect,
+  onStartSelection,
 }: ProductAtShopCardProps) => {
   const { user } = useAuth();
   const employeeId = user?.id;
@@ -134,12 +143,42 @@ export const ProductAtShopCard = ({
   
   // Multi-promotion dialog state
   const [showMultiPromotionDialog, setShowMultiPromotionDialog] = useState(false);
+  const longPressTimerRef = useRef<number | null>(null);
 
   const currentPrice = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date() ? offerPrice : price;
   const hasActiveOffer = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date();
   const daysRemaining = hasActiveOffer ? getDaysRemaining(offerExpiryDate!) : 0;
   // Orange styling only shows when offer expires in 1 day or less
   const isUrgentOffer = hasActiveOffer && daysRemaining <= 1;
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const isInteractiveTarget = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return false;
+    return !!target.closest("button, input, textarea, select, a, label, [role='button']");
+  };
+
+  const handlePressStart = (e: React.MouseEvent | React.TouchEvent) => {
+    if (selectionMode || isInteractiveTarget(e.target)) return;
+    clearLongPressTimer();
+    longPressTimerRef.current = window.setTimeout(() => {
+      onStartSelection?.(productId);
+    }, 500);
+  };
+
+  const handlePressEnd = () => {
+    clearLongPressTimer();
+  };
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (!selectionMode || isInteractiveTarget(e.target)) return;
+    onToggleSelect?.(productId);
+  };
 
   // Update component state when props change (after data refresh)
   useEffect(() => {
@@ -151,6 +190,12 @@ export const ProductAtShopCard = ({
     setInlineAisle(aiel || "");
     setInlinePrice(price.toString());
   }, [price, offerPrice, offerExpiryDate, aiel]);
+
+  useEffect(() => {
+    return () => {
+      clearLongPressTimer();
+    };
+  }, []);
 
   // Handle inline save for aisle and price
   const handleInlineSave = async () => {
@@ -425,10 +470,37 @@ export const ProductAtShopCard = ({
   };
 
   return (
-    <Card className={`product-card w-full relative ${outOfStock ? 'ring-2 ring-gray-400 bg-gray-100 opacity-75' : isUrgentOffer ? 'ring-2 ring-orange-400 bg-orange-50' : ''}`}>
+    <Card
+      className={`product-card w-full relative transition-colors ${
+        isSelected
+          ? "ring-2 ring-blue-500 bg-blue-50"
+          : outOfStock
+            ? "ring-2 ring-gray-400 bg-gray-100 opacity-75"
+            : isUrgentOffer
+              ? "ring-2 ring-orange-400 bg-orange-50"
+              : ""
+      }`}
+      onMouseDown={handlePressStart}
+      onMouseUp={handlePressEnd}
+      onMouseLeave={handlePressEnd}
+      onTouchStart={handlePressStart}
+      onTouchEnd={handlePressEnd}
+      onTouchCancel={handlePressEnd}
+      onClick={handleCardClick}
+    >
+      {selectionMode && (
+        <div className="absolute top-2 left-2 z-20">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect?.(productId)}
+            aria-label={`Select ${title}`}
+            className="bg-white"
+          />
+        </div>
+      )}
       {/* Out of Stock Badge - Top Left */}
       {outOfStock && (
-        <div className="absolute top-0 left-0 px-2 py-1 rounded-br-lg bg-gray-600 text-white">
+        <div className={`absolute top-0 px-2 py-1 rounded-br-lg bg-gray-600 text-white ${selectionMode ? "left-9" : "left-0"}`}>
           <span className="text-xs font-bold">Out of Stock</span>
         </div>
       )}
@@ -456,79 +528,83 @@ export const ProductAtShopCard = ({
             </div>
           </div>
           {/* Action Icons */}
-          <div className="flex gap-1 flex-shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setEditProductTitle(title);
-                setEditProductCaseSize(caseSize);
-                setEditProductPacketSize(packetSize);
-                setEditProductRetailSize(retailSize);
-                setEditProductRrp(rrp.toString());
-                setEditProductBarcode(barcode);
-                setEditProductCaseBarcode(caseBarcode || "");
-                setEditProductCategory(category || "");
-                setSelectedImage(null);
-                setImagePreview(null);
-                setShowEditProductDialog(true);
-              }}
-              className="h-8 w-8 p-0"
-              title="Edit Product"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowMultiPromotionDialog(true)}
-              className="h-8 w-8 p-0"
-              title="Promotions"
-            >
-              <Tags className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={isUrgentOffer ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setIsEditing(true)}
-              className={`h-8 w-8 p-0 ${isUrgentOffer ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
-              title="Set Offer"
-            >
-              <Tag className="h-4 w-4" />
-            </Button>
-          </div>
+          {!selectionMode && (
+            <div className="flex gap-1 flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditProductTitle(title);
+                  setEditProductCaseSize(caseSize);
+                  setEditProductPacketSize(packetSize);
+                  setEditProductRetailSize(retailSize);
+                  setEditProductRrp(rrp.toString());
+                  setEditProductBarcode(barcode);
+                  setEditProductCaseBarcode(caseBarcode || "");
+                  setEditProductCategory(category || "");
+                  setSelectedImage(null);
+                  setImagePreview(null);
+                  setShowEditProductDialog(true);
+                }}
+                className="h-8 w-8 p-0"
+                title="Edit Product"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMultiPromotionDialog(true)}
+                className="h-8 w-8 p-0"
+                title="Promotions"
+              >
+                <Tags className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={isUrgentOffer ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setIsEditing(true)}
+                className={`h-8 w-8 p-0 ${isUrgentOffer ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
+                title="Set Offer"
+              >
+                <Tag className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Row 2: Quick Edit */}
-        <div className="flex items-center gap-2 mt-2 pt-2 border-t">
-          <div className="flex-1">
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">£</span>
+        {!selectionMode && (
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t">
+            <div className="flex-1">
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">£</span>
+                <Input
+                  type="text"
+                  value={inlinePrice}
+                  onChange={(e) => handlePriceInputChange(e.target.value, setInlinePrice)}
+                  className="h-8 text-sm pl-6"
+                  placeholder="Price"
+                />
+              </div>
+            </div>
+            <div className="w-16">
               <Input
                 type="text"
-                value={inlinePrice}
-                onChange={(e) => handlePriceInputChange(e.target.value, setInlinePrice)}
-                className="h-8 text-sm pl-6"
-                placeholder="Price"
+                value={inlineAisle}
+                onChange={(e) => setInlineAisle(e.target.value)}
+                className="h-8 text-sm text-center"
+                placeholder="Aisle"
               />
             </div>
+            <Button size="sm" onClick={handleInlineSave} className="h-8 px-3">
+              <Check className="h-4 w-4" />
+            </Button>
           </div>
-          <div className="w-16">
-            <Input
-              type="text"
-              value={inlineAisle}
-              onChange={(e) => setInlineAisle(e.target.value)}
-              className="h-8 text-sm text-center"
-              placeholder="Aisle"
-            />
-          </div>
-          <Button size="sm" onClick={handleInlineSave} className="h-8 px-3">
-            <Check className="h-4 w-4" />
-          </Button>
-        </div>
+        )}
 
         {/* Offer Edit Form (Expandable) */}
-        {isEditing && (
+        {isEditing && !selectionMode && (
           <div className="mt-2 pt-2 border-t space-y-2">
             <div className="grid grid-cols-3 gap-2">
               <div>

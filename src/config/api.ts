@@ -7,6 +7,8 @@ export const API_CONFIG = {
     CUSTOMERS: '/admin/customers',
     CUSTOMER_SUBSCRIPTION: (customerId: number) => `/admin/customers/${customerId}/subscription`,
     PROCESS_EXPIRED_TRIALS: '/admin/process-expired-trials',
+    LIST_ITEMS: '/admin/list-items',
+    UPDATE_LIST_ITEM_CASE_BARCODE: '/admin/list-items/case-barcode',
   },
   
   // Auth endpoints

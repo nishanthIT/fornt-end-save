@@ -105,7 +105,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Grid, Box, Users, Store, Menu, UserCircle, LogOut, AlertTriangle, Image, Newspaper, MonitorPlay } from "lucide-react";
+import { Grid, Box, Users, Store, Menu, UserCircle, LogOut, AlertTriangle, Image, Newspaper, MonitorPlay, ListTree } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const Navbar = () => {
@@ -119,6 +119,7 @@ export const Navbar = () => {
     { icon: Store, label: "Shops", path: "/shops" },
     { icon: Users, label: "Customers", path: "/customers" },
     { icon: UserCircle, label: "Employees", path: "/employees" },
+    { icon: ListTree, label: "Items in User List", path: "/items-in-user-list" },
     { icon: AlertTriangle, label: "Price Corrections", path: "/price-corrections" },
     { icon: Image, label: "Promotions", path: "/promotions" },
     { icon: MonitorPlay, label: "Advertisements", path: "/advertisements" },
