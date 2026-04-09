@@ -5,6 +5,7 @@ export const API_CONFIG = {
   // Admin endpoints
   ADMIN: {
     CUSTOMERS: '/admin/customers',
+    DELETE_CUSTOMER: (customerId: number) => `/admin/customers/${customerId}`,
     CUSTOMER_SUBSCRIPTION: (customerId: number) => `/admin/customers/${customerId}/subscription`,
     PROCESS_EXPIRED_TRIALS: '/admin/process-expired-trials',
     LIST_ITEMS: '/admin/list-items',

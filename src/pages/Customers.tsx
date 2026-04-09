@@ -73,6 +73,7 @@ const Customers = () => {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [upgradingCustomerId, setUpgradingCustomerId] = useState<number | null>(null);
   const [selectedDuration, setSelectedDuration] = useState<number>(30);
+  const [deletingCustomerId, setDeletingCustomerId] = useState<number | null>(null);
 
   const fetchCustomers = async () => {
     try {
@@ -114,9 +115,35 @@ const Customers = () => {
     }
   };
 
-  const handleDelete = (id: number) => {
-    setCustomers(customers.filter(c => c.id !== id));
-    toast.success("Customer deleted successfully!");
+  const handleDelete = async (id: number) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to permanently delete this customer and all related data (lists, chats/messages, linked records)?"
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    setDeletingCustomerId(id);
+    try {
+      const response = await fetch(getAdminUrl(API_CONFIG.ADMIN.DELETE_CUSTOMER(id)), {
+        method: 'DELETE',
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (response.ok && data?.success) {
+        await fetchCustomers();
+        toast.success(data.message || 'Customer deleted successfully!');
+      } else {
+        toast.error(data?.error || data?.message || 'Failed to delete customer');
+      }
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      toast.error('Failed to delete customer');
+    } finally {
+      setDeletingCustomerId(null);
+    }
   };
 
   const openUpgradeModal = (customerId: number) => {
@@ -401,6 +428,7 @@ const Customers = () => {
                   )}
                   {customer.subscriptionDetails.status === 'Free Trial Active' && 
                    customer.subscriptionDetails.daysRemaining !== 'Unknown' && 
+                   typeof customer.subscriptionDetails.daysRemaining === 'number' &&
                    customer.subscriptionDetails.daysRemaining <= 7 && (
                     <Button
                       variant="outline"
@@ -415,11 +443,12 @@ const Customers = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDelete(customer.id)}
+                    disabled={deletingCustomerId === customer.id}
                     title="Delete customer"
                     className="text-destructive hover:bg-red-50 flex items-center gap-2"
                   >
                     <Trash2 className="h-4 w-4" />
-                    <span className="lg:hidden">Delete</span>
+                    <span className="lg:hidden">{deletingCustomerId === customer.id ? 'Deleting...' : 'Delete'}</span>
                   </Button>
                 </div>
               </div>
