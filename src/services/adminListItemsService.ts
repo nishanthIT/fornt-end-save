@@ -9,13 +9,25 @@ export interface ListItemSummary {
   barcode: string | null;
   caseBarcode: string | null;
   img?: string | string[] | { url?: string } | null;
+  shopId: string;
+  shopName: string;
+  aisle: string;
+  aisleValue: string;
   listCount: number;
   lastUpdated: string | null;
+}
+
+export interface ListItemsFilterOption {
+  value: string;
+  label: string;
+  count: number;
 }
 
 export interface ListItemsQuery {
   search?: string;
   missingCaseBarcode?: boolean;
+  shopId?: string;
+  aisle?: string;
   sortBy?: 'itemName' | 'itemId' | 'caseBarcode' | 'listCount' | 'lastUpdated';
   sortOrder?: 'asc' | 'desc';
   page?: number;
@@ -26,6 +38,12 @@ export interface ListItemsResponse {
   success: boolean;
   data: {
     items: ListItemSummary[];
+    filters: {
+      shops: ListItemsFilterOption[];
+      aisles: ListItemsFilterOption[];
+      selectedShop: string | null;
+      selectedAisle: string | null;
+    };
     pagination: {
       page: number;
       limit: number;
@@ -49,6 +67,8 @@ class AdminListItemsService {
 
     if (query.search) params.append('search', query.search);
     if (query.missingCaseBarcode) params.append('missingCaseBarcode', 'true');
+    if (query.shopId) params.append('shopId', query.shopId);
+    if (query.aisle) params.append('aisle', query.aisle);
     if (query.sortBy) params.append('sortBy', query.sortBy);
     if (query.sortOrder) params.append('sortOrder', query.sortOrder);
     if (query.page) params.append('page', String(query.page));

@@ -1,15 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpDown, Barcode, PencilLine, RefreshCw, ScanLine, Search, Upload, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowUpDown, PencilLine, RefreshCw, ScanLine, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { OptimizedScanner } from '@/components/OptimizedScanner';
-import { CategorySelect } from '@/components/CategorySelect';
 import { getImageUrl } from '@/utils/imageUtils';
-import { API_CONFIG } from '@/config/api';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +27,7 @@ import {
 } from '@/components/ui/table';
 import {
   adminListItemsService,
+  ListItemsFilterOption,
   ListItemSummary,
 } from '@/services/adminListItemsService';
 
@@ -35,6 +35,9 @@ type SortBy = 'itemName' | 'itemId' | 'caseBarcode' | 'listCount' | 'lastUpdated
 type SortOrder = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 20;
+const ALL_FILTER_VALUE = 'all';
+const UNKNOWN_SHOP_VALUE = '__UNKNOWN_SHOP__';
+const UNKNOWN_SHOP_LABEL = 'Unknown Shop';
 
 const ItemsInUserList = () => {
   const [items, setItems] = useState<ListItemSummary[]>([]);
@@ -44,32 +47,21 @@ const ItemsInUserList = () => {
   const [missingCaseBarcodeOnly, setMissingCaseBarcodeOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>('lastUpdated');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [selectedShopId, setSelectedShopId] = useState(ALL_FILTER_VALUE);
+  const [selectedAisle, setSelectedAisle] = useState(ALL_FILTER_VALUE);
+  const [shopOptions, setShopOptions] = useState<ListItemsFilterOption[]>([]);
+  const [aisleOptions, setAisleOptions] = useState<ListItemsFilterOption[]>([]);
+  const [allShopsOptions, setAllShopsOptions] = useState<ListItemsFilterOption[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ListItemSummary | null>(null);
+  const [caseBarcodeInput, setCaseBarcodeInput] = useState('');
   const [searchScannerOpen, setSearchScannerOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [loadingProduct, setLoadingProduct] = useState(false);
-
-  const [editForm, setEditForm] = useState({
-    title: '',
-    barcode: '',
-    caseBarcode: '',
-    caseSize: '1',
-    packetSize: '1',
-    retailSize: '',
-    rrp: '',
-    category: '',
-  });
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [editImageUrl, setEditImageUrl] = useState<string>('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
-  const [showCaseBarcodeScanner, setShowCaseBarcodeScanner] = useState(false);
 
   const loadItems = async () => {
     try {
@@ -77,6 +69,8 @@ const ItemsInUserList = () => {
       const response = await adminListItemsService.getListItems({
         search,
         missingCaseBarcode: missingCaseBarcodeOnly,
+        shopId: selectedShopId !== ALL_FILTER_VALUE ? selectedShopId : undefined,
+        aisle: selectedAisle !== ALL_FILTER_VALUE ? selectedAisle : undefined,
         sortBy,
         sortOrder,
         page,
@@ -84,6 +78,8 @@ const ItemsInUserList = () => {
       });
 
       setItems(response.data.items);
+  setShopOptions(response.data.filters?.shops || []);
+  setAisleOptions(response.data.filters?.aisles || []);
       setTotalPages(response.data.pagination.totalPages || 1);
       setTotalItems(response.data.pagination.total || 0);
     } catch (error) {
@@ -96,7 +92,7 @@ const ItemsInUserList = () => {
 
   useEffect(() => {
     loadItems();
-  }, [search, missingCaseBarcodeOnly, sortBy, sortOrder, page]);
+  }, [search, missingCaseBarcodeOnly, selectedShopId, selectedAisle, sortBy, sortOrder, page]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -106,6 +102,73 @@ const ItemsInUserList = () => {
 
     return () => clearTimeout(timeout);
   }, [searchInput]);
+
+  useEffect(() => {
+    const loadAllShops = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+        const response = await fetch(`${base}/getAllshop?shopType=WHOLESALE`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: 'include',
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!Array.isArray(data)) return;
+
+        const normalized = data
+          .map((shop: { id?: string; name?: string }) => ({
+            value: String(shop?.id || '').trim(),
+            label: String(shop?.name || '').trim() || UNKNOWN_SHOP_LABEL,
+            count: 0,
+          }))
+          .filter((shop: ListItemsFilterOption) => shop.value.length > 0)
+          .sort((a: ListItemsFilterOption, b: ListItemsFilterOption) => a.label.localeCompare(b.label));
+
+        setAllShopsOptions(normalized);
+      } catch {
+        setAllShopsOptions([]);
+      }
+    };
+
+    loadAllShops();
+  }, []);
+
+  const effectiveShopOptions = useMemo(() => {
+    if (shopOptions.length > 0) return shopOptions;
+
+    const hasUnknownInItems = items.some((item) => !String(item.shopId || '').trim());
+    const merged = [...allShopsOptions];
+    if (hasUnknownInItems && !merged.some((shop) => shop.value === UNKNOWN_SHOP_VALUE)) {
+      merged.push({ value: UNKNOWN_SHOP_VALUE, label: UNKNOWN_SHOP_LABEL, count: 0 });
+    }
+    return merged;
+  }, [shopOptions, allShopsOptions, items]);
+
+  const effectiveAisleOptions = useMemo(() => {
+    if (aisleOptions.length > 0) return aisleOptions;
+    return [];
+  }, [aisleOptions]);
+
+  useEffect(() => {
+    if (selectedShopId !== ALL_FILTER_VALUE && !effectiveShopOptions.some((shop) => shop.value === selectedShopId)) {
+      setSelectedShopId(ALL_FILTER_VALUE);
+      setSelectedAisle(ALL_FILTER_VALUE);
+      setPage(1);
+    }
+  }, [effectiveShopOptions, selectedShopId]);
+
+  useEffect(() => {
+    if (selectedAisle !== ALL_FILTER_VALUE && !effectiveAisleOptions.some((aisle) => aisle.value === selectedAisle)) {
+      setSelectedAisle(ALL_FILTER_VALUE);
+      setPage(1);
+    }
+  }, [effectiveAisleOptions, selectedAisle]);
 
   const toggleSort = (nextSortBy: SortBy) => {
     if (sortBy === nextSortBy) {
@@ -117,150 +180,29 @@ const ItemsInUserList = () => {
     setSortOrder('asc');
   };
 
-  const formatPriceInput = (value: string): string => {
-    const digits = value.replace(/\D/g, '');
-    if (!digits) return '';
-    const num = parseInt(digits, 10);
-    return (num / 100).toFixed(2);
-  };
-
-  const handlePriceChange = (value: string) => {
-    const cleanValue = value.replace(/[^0-9]/g, '');
-    const formatted = formatPriceInput(cleanValue);
-    setEditForm((prev) => ({ ...prev, rrp: formatted }));
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleRemoveImage = () => {
-    setSelectedImage(null);
-    setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const openEditModal = async (item: ListItemSummary) => {
+  const openEditModal = (item: ListItemSummary) => {
     setEditingItem(item);
-    setSelectedImage(null);
-    setImagePreview(null);
-    setShowBarcodeScanner(false);
-    setShowCaseBarcodeScanner(false);
+    setCaseBarcodeInput(item.caseBarcode || '');
+    setScannerOpen(false);
     setIsEditOpen(true);
-
-    setEditForm({
-      title: item.itemName || '',
-      barcode: item.barcode || '',
-      caseBarcode: item.caseBarcode || '',
-      caseSize: '1',
-      packetSize: '1',
-      retailSize: '',
-      rrp: '',
-      category: '',
-    });
-    setEditImageUrl(getImageUrl(item.img || null));
-
-    if (!item.itemId) return;
-
-    try {
-      setLoadingProduct(true);
-      const authToken = localStorage.getItem('auth_token');
-      const response = await fetch(
-        `${API_CONFIG.BASE_URL}/getProductById/${item.itemId}`,
-        {
-          headers: {
-            ...(authToken && { Authorization: `Bearer ${authToken}` }),
-          },
-          credentials: 'include',
-        }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        const product = data.product || data.data || data;
-        setEditForm({
-          title: product.title || item.itemName || '',
-          barcode: product.barcode || item.barcode || '',
-          caseBarcode: product.caseBarcode || item.caseBarcode || '',
-          caseSize: product.caseSize || '1',
-          packetSize: product.packetSize || '1',
-          retailSize: product.retailSize || '',
-          rrp: product.rrp ? String(product.rrp) : '',
-          category: product.category || '',
-        });
-        if (product.img) {
-          setEditImageUrl(getImageUrl(product.img));
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch product details:', error);
-    } finally {
-      setLoadingProduct(false);
-    }
   };
 
-  const saveProduct = async () => {
+  const saveCaseBarcode = async () => {
     if (!editingItem?.itemId) {
       toast.error('Cannot update this item: missing item ID');
       return;
     }
 
-    if (!editForm.title.trim()) {
-      toast.error('Product name is required');
-      return;
-    }
-
     try {
       setSaving(true);
-      const formData = new FormData();
-      formData.append('title', editForm.title.toUpperCase());
-      formData.append('barcode', editForm.barcode);
-      formData.append('caseBarcode', editForm.caseBarcode);
-      formData.append('caseSize', editForm.caseSize);
-      formData.append('packetSize', editForm.packetSize);
-      formData.append('retailSize', editForm.retailSize);
-      formData.append('rrp', editForm.rrp);
-      formData.append('category', editForm.category);
-
-      if (selectedImage) {
-        formData.append('image', selectedImage);
-      }
-
-      const authToken = localStorage.getItem('auth_token');
-      const response = await fetch(
-        `${API_CONFIG.BASE_URL}/editProduct/${editingItem.itemId}`,
-        {
-          method: 'PUT',
-          body: formData,
-          headers: {
-            ...(authToken && { Authorization: `Bearer ${authToken}` }),
-          },
-          credentials: 'include',
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to update product');
-      }
-
-      toast.success('Product updated successfully!');
+      await adminListItemsService.updateCaseBarcode(editingItem.itemId, caseBarcodeInput);
+      toast.success('Case barcode updated globally');
       setIsEditOpen(false);
-      setSelectedImage(null);
-      setImagePreview(null);
+      setScannerOpen(false);
       await loadItems();
     } catch (error) {
-      console.error('Failed to update product:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update product');
+      console.error('Failed to update case barcode:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update case barcode');
     } finally {
       setSaving(false);
     }
@@ -340,6 +282,55 @@ const ItemsInUserList = () => {
                 Missing case barcode only
               </label>
             </div>
+
+            <div className="space-y-1 md:col-span-1">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Shop</label>
+              <Select
+                value={selectedShopId}
+                onValueChange={(value) => {
+                  setPage(1);
+                  setSelectedShopId(value);
+                  setSelectedAisle(ALL_FILTER_VALUE);
+                }}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="All shops" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_FILTER_VALUE}>All shops</SelectItem>
+                  {effectiveShopOptions.map((shop) => (
+                    <SelectItem key={shop.value} value={shop.value}>
+                      {shop.count > 0 ? `${shop.label} (${shop.count})` : shop.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedShopId !== ALL_FILTER_VALUE && (
+            <div className="space-y-1 md:col-span-1">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Aisle</label>
+              <Select
+                value={selectedAisle}
+                onValueChange={(value) => {
+                  setPage(1);
+                  setSelectedAisle(value);
+                }}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="All aisles" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_FILTER_VALUE}>All aisles</SelectItem>
+                  {effectiveAisleOptions.map((aisle) => (
+                    <SelectItem key={aisle.value} value={aisle.value}>
+                      {aisle.label} ({aisle.count})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -409,6 +400,9 @@ const ItemsInUserList = () => {
                         <div className="hidden xl:block text-xs text-gray-500 truncate max-w-[280px]">
                           Barcode: {item.barcode || 'N/A'}
                         </div>
+                        <div className="hidden xl:block text-xs text-gray-500 truncate max-w-[280px]">
+                          Shop: {item.shopName || 'Unknown Shop'} | Aisle: {item.aisle || 'No Aisle'}
+                        </div>
                       </TableCell>
                       <TableCell className="py-2">
                         {missingCaseBarcode ? (
@@ -466,6 +460,9 @@ const ItemsInUserList = () => {
                             <span className="font-mono">{item.caseBarcode}</span>
                           )}
                         </div>
+                        <div className="text-[11px] text-gray-500 truncate">
+                          {item.shopName || 'Unknown Shop'} | {item.aisle || 'No Aisle'}
+                        </div>
                       </div>
 
                       {missingCaseBarcode ? (
@@ -513,226 +510,66 @@ const ItemsInUserList = () => {
         open={isEditOpen}
         onOpenChange={(open) => {
           setIsEditOpen(open);
-          if (!open) {
-            setShowBarcodeScanner(false);
-            setShowCaseBarcodeScanner(false);
-          }
+          if (!open) setScannerOpen(false);
         }}
       >
-        <DialogContent className="w-[95vw] max-w-md mx-auto max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Edit Product</DialogTitle>
+            <DialogTitle>Update Case Barcode</DialogTitle>
             <DialogDescription>
-              Update product details. Changes apply globally across all user lists.
+              This updates the global case barcode for the item across all user lists.
             </DialogDescription>
           </DialogHeader>
 
-          {loadingProduct ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-5 w-5 animate-spin text-gray-400 mr-2" />
-              <span className="text-sm text-gray-500">Loading product details...</span>
+          <div className="space-y-3">
+            <div className="text-sm font-medium text-gray-800 dark:text-gray-200">{editingItem?.itemName}</div>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                className="sm:w-auto"
+                onClick={() => setScannerOpen((prev) => !prev)}
+              >
+                <ScanLine className="mr-2 h-4 w-4" />
+                {scannerOpen ? 'Hide Scanner' : 'Scan Barcode'}
+              </Button>
+              <div className="text-xs text-gray-500 sm:self-center">Scan auto-fills input. You can also type manually.</div>
             </div>
-          ) : (
-            <div className="space-y-4 py-2">
-              <div>
-                <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">Product Name *</label>
-                <Input
-                  placeholder="Enter product name"
-                  value={editForm.title}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value.toUpperCase() }))}
-                  className="uppercase"
+
+            {scannerOpen && (
+              <div className="rounded-md border p-2">
+                <OptimizedScanner
+                  onScan={(result) => {
+                    if (!result) return;
+                    setCaseBarcodeInput(result);
+                    setScannerOpen(false);
+                    toast.success(`Scanned and auto-filled: ${result}`);
+                  }}
+                  onError={(error) => {
+                    toast.error(error.message || 'Scanner error');
+                  }}
+                  height={220}
                 />
               </div>
+            )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">Barcode</label>
-                  <div className="relative">
-                    <Input
-                      placeholder="Barcode"
-                      value={editForm.barcode}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, barcode: e.target.value }))}
-                      className="pr-10"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowBarcodeScanner(true)}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                      type="button"
-                    >
-                      <Barcode className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">Case Barcode</label>
-                  <div className="relative">
-                    <Input
-                      placeholder="Case barcode"
-                      value={editForm.caseBarcode}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, caseBarcode: e.target.value }))}
-                      className="pr-10"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowCaseBarcodeScanner(true)}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                      type="button"
-                    >
-                      <Barcode className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">Case Size</label>
-                  <Input
-                    placeholder="1"
-                    value={editForm.caseSize}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, caseSize: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">Packet Size</label>
-                  <Input
-                    placeholder="1"
-                    value={editForm.packetSize}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, packetSize: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">RRP (e.g. 456 = £4.56)</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
-                  <Input
-                    className="pl-7"
-                    placeholder="0.00"
-                    value={editForm.rrp}
-                    onChange={(e) => handlePriceChange(e.target.value)}
-                    inputMode="numeric"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">Category</label>
-                <CategorySelect
-                  value={editForm.category}
-                  onChange={(val) => setEditForm((prev) => ({ ...prev, category: val }))}
-                  placeholder="Select category..."
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">Current Image</label>
-                <img
-                  src={editImageUrl}
-                  alt={editForm.title}
-                  className="w-16 h-16 object-cover rounded-md"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">Upload New Image (Optional)</label>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImageChange}
-                  accept="image/*"
-                  className="hidden"
-                />
-                {imagePreview ? (
-                  <div className="relative w-16 h-16 mt-1">
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-full h-full object-cover rounded-md"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRemoveImage}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="mt-1"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Choose Image
-                  </Button>
-                )}
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsEditOpen(false)}
-                  className="flex-1"
-                  disabled={saving}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={saveProduct}
-                  className="flex-1"
-                  disabled={saving}
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showBarcodeScanner} onOpenChange={setShowBarcodeScanner}>
-        <DialogContent className="w-[95vw] max-w-md mx-auto">
-          <DialogHeader>
-            <DialogTitle>Scan Product Barcode</DialogTitle>
-          </DialogHeader>
-          <div className="w-full max-w-full overflow-hidden">
-            <OptimizedScanner
-              width="100%"
-              height={250}
-              onScan={(result) => {
-                setEditForm((prev) => ({ ...prev, barcode: result }));
-                setShowBarcodeScanner(false);
-                toast.success('Barcode scanned!');
-              }}
+            <Input
+              value={caseBarcodeInput}
+              onChange={(e) => setCaseBarcodeInput(e.target.value)}
+              placeholder="Scan or enter case barcode manually"
             />
+            <p className="text-xs text-gray-500">Leave empty to clear barcode.</p>
           </div>
-        </DialogContent>
-      </Dialog>
 
-      <Dialog open={showCaseBarcodeScanner} onOpenChange={setShowCaseBarcodeScanner}>
-        <DialogContent className="w-[95vw] max-w-md mx-auto">
-          <DialogHeader>
-            <DialogTitle>Scan Case Barcode</DialogTitle>
-          </DialogHeader>
-          <div className="w-full max-w-full overflow-hidden">
-            <OptimizedScanner
-              width="100%"
-              height={250}
-              onScan={(result) => {
-                setEditForm((prev) => ({ ...prev, caseBarcode: result }));
-                setShowCaseBarcodeScanner(false);
-                toast.success('Case barcode scanned!');
-              }}
-            />
-          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={saveCaseBarcode} disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
