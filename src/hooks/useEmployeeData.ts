@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { PassThrough } from "stream";
 
 type ProductActivity = {
   date: string;
@@ -13,7 +12,9 @@ type ProductActivity = {
 type Employee = {
   id: number;
   name: string;
-  phone: string;
+  phoneNo: string;
+  email: string;
+  password?: string;
 };
 
 type EmployeeWithActivity = Employee & {
@@ -65,8 +66,8 @@ const useEmployeeData = () => {
     const employees: Employee[] = data.data.map((emp: any) => ({
       id: emp.id,
       name: emp.name,
-      phoneNo: emp.phone,
-      email:emp.email,
+      phoneNo: emp.phoneNo || emp.phone || '',
+      email: emp.email || '',
       password: emp.password
     }));
 

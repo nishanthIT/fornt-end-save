@@ -61,7 +61,7 @@
 import { useEffect, useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Users, Package, Store } from "lucide-react";
+import { Users, Package, Store, ListTree } from "lucide-react";
 import api from '@/utils/axiosInstance';
 
 const Dashboard = () => {
@@ -90,6 +90,7 @@ const Dashboard = () => {
             let icon = Users;
             if (stat.label === 'Total Products') icon = Package;
             if (stat.label === 'Total Shops') icon = Store;
+            if (stat.label === 'List Item Updates') icon = ListTree;
             
             return {
               ...stat,

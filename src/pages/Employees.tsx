@@ -21,6 +21,7 @@ import { Edit, Plus, User, ChevronDown, Trash  } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import useEmployeeData from "@/hooks/useEmployeeData"; // Adjust the import pat
+import { adminListItemsService, ListItemUpdateLog, ListItemUpdateSummary } from "@/services/adminListItemsService";
 
 
 interface Employee {
@@ -28,7 +29,7 @@ interface Employee {
   name: string;
   phoneNo: string;
   email:string;
-  password: string;
+  password?: string;
 }
 
 interface ProductActivity {
@@ -52,6 +53,9 @@ const Employees = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showHourlyBreakdown, setShowHourlyBreakdown] = useState(false);
+  const [listItemUpdates, setListItemUpdates] = useState<ListItemUpdateLog[]>([]);
+  const [listItemUpdateSummary, setListItemUpdateSummary] = useState<ListItemUpdateSummary | null>(null);
+  const [updatesLoading, setUpdatesLoading] = useState(false);
   const [newEmployee, setNewEmployee] = useState<Omit<Employee, "id">>({
     name: "",
     phoneNo: "",
@@ -233,6 +237,65 @@ const Employees = () => {
     return dayActivity?.hourlyBreakdown || [];
   };
 
+  const getUpdateSummary = (update: ListItemUpdateLog) => {
+    const beforeProduct = (update.beforeData as { product?: Record<string, unknown> })?.product || {};
+    const afterProduct = (update.afterData as { product?: Record<string, unknown> })?.product || {};
+    const beforeShop = (update.beforeData as { productAtShop?: Record<string, unknown> })?.productAtShop || {};
+    const afterShop = (update.afterData as { productAtShop?: Record<string, unknown> })?.productAtShop || {};
+
+    const changes: string[] = [];
+    const productFields: Array<[string, string]> = [
+      ['title', 'Name'],
+      ['barcode', 'Barcode'],
+      ['caseBarcode', 'Case Barcode'],
+      ['caseSize', 'Case Size'],
+      ['packetSize', 'Packet Size'],
+      ['retailSize', 'Retail Size'],
+      ['rrp', 'RRP'],
+      ['category', 'Category'],
+    ];
+
+    productFields.forEach(([field, label]) => {
+      const beforeValue = beforeProduct[field];
+      const afterValue = afterProduct[field];
+      if (beforeValue !== undefined && afterValue !== undefined && beforeValue !== afterValue) {
+        changes.push(`${label}: ${beforeValue ?? '—'} → ${afterValue ?? '—'}`);
+      }
+    });
+
+    if (beforeShop.price !== undefined && afterShop.price !== undefined && beforeShop.price !== afterShop.price) {
+      changes.push(`Price: ${beforeShop.price ?? '—'} → ${afterShop.price ?? '—'}`);
+    }
+
+    if (changes.length === 0) return 'No field changes captured.';
+    return changes.join(' · ');
+  };
+
+  useEffect(() => {
+    if (!selectedEmployee) {
+      setListItemUpdates([]);
+      setListItemUpdateSummary(null);
+      return;
+    }
+
+    const fetchUpdates = async () => {
+      try {
+        setUpdatesLoading(true);
+        const response = await adminListItemsService.getEmployeeListItemUpdates(selectedEmployee.id, 50, 30);
+        setListItemUpdates(response.logs);
+        setListItemUpdateSummary(response.summary);
+      } catch (error) {
+        console.error("Failed to fetch employee list item updates:", error);
+        setListItemUpdates([]);
+        setListItemUpdateSummary(null);
+      } finally {
+        setUpdatesLoading(false);
+      }
+    };
+
+    fetchUpdates();
+  }, [selectedEmployee]);
+
 if(loading) {
   return <p>Loading...</p>
 }
@@ -388,6 +451,53 @@ if(loading) {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-base sm:text-lg font-semibold">List Item Update History</h3>
+                {listItemUpdateSummary && (
+                  <div className="rounded-md border p-3 text-xs sm:text-sm text-muted-foreground">
+                    <div className="font-semibold text-sm text-foreground">
+                      Unique updates (last {listItemUpdateSummary.rangeDays} days): {listItemUpdateSummary.totalUnique}
+                    </div>
+                    {listItemUpdateSummary.byDate.length > 0 ? (
+                      <div className="mt-2 space-y-1">
+                        {listItemUpdateSummary.byDate.map((entry) => (
+                          <div key={entry.date} className="flex items-center justify-between">
+                            <span>{format(new Date(entry.date), 'MMM dd, yyyy')}</span>
+                            <span>{entry.uniqueProducts} unique · {entry.totalEdits} edits</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-2">No updates in this period.</div>
+                    )}
+                  </div>
+                )}
+                {updatesLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading updates...</p>
+                ) : listItemUpdates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No list item updates found.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {listItemUpdates.map((update) => (
+                      <Card key={update.id}>
+                        <CardContent className="p-3">
+                          <div className="text-sm font-semibold">{update.product?.title || "Unnamed Item"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {update.product?.barcode || update.product?.caseBarcode || "No barcode"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {update.shop?.name || "Unknown shop"} · {format(new Date(update.timestamp), 'MMM dd, yyyy HH:mm')}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {getUpdateSummary(update)}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ) : (

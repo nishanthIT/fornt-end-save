@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { OptimizedScanner } from '@/components/OptimizedScanner';
+import { CategorySelect } from '@/components/CategorySelect';
 import { getImageUrl } from '@/utils/imageUtils';
 import {
   Dialog,
@@ -58,9 +59,18 @@ const ItemsInUserList = () => {
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ListItemSummary | null>(null);
+  const [itemNameInput, setItemNameInput] = useState('');
+  const [barcodeInput, setBarcodeInput] = useState('');
   const [caseBarcodeInput, setCaseBarcodeInput] = useState('');
+  const [priceInput, setPriceInput] = useState('');
+  const [rrpInput, setRrpInput] = useState('');
+  const [caseSizeInput, setCaseSizeInput] = useState('');
+  const [packetSizeInput, setPacketSizeInput] = useState('');
+  const [retailSizeInput, setRetailSizeInput] = useState('');
+  const [categoryInput, setCategoryInput] = useState('');
   const [searchScannerOpen, setSearchScannerOpen] = useState(false);
-  const [scannerOpen, setScannerOpen] = useState(false);
+  const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
+  const [caseBarcodeScannerOpen, setCaseBarcodeScannerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const loadItems = async () => {
@@ -180,29 +190,77 @@ const ItemsInUserList = () => {
     setSortOrder('asc');
   };
 
+  const formatPriceInput = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (!digits) return '';
+    const pence = parseInt(digits, 10);
+    return (pence / 100).toFixed(2);
+  };
+
+  const handlePriceChange = (value: string, setter: (nextValue: string) => void) => {
+    setter(formatPriceInput(value));
+  };
+
   const openEditModal = (item: ListItemSummary) => {
     setEditingItem(item);
+    setItemNameInput(item.itemName || '');
+    setBarcodeInput(item.barcode || '');
     setCaseBarcodeInput(item.caseBarcode || '');
-    setScannerOpen(false);
+    setPriceInput(item.price != null ? String(item.price) : '');
+    setRrpInput(item.rrp != null ? String(item.rrp) : '');
+    setCaseSizeInput(item.caseSize || '');
+    setPacketSizeInput(item.packetSize || '');
+    setRetailSizeInput(item.retailSize || '');
+    setCategoryInput(item.category || '');
+    setBarcodeScannerOpen(false);
+    setCaseBarcodeScannerOpen(false);
     setIsEditOpen(true);
   };
 
-  const saveCaseBarcode = async () => {
+  const saveItemDetails = async () => {
     if (!editingItem?.itemId) {
       toast.error('Cannot update this item: missing item ID');
       return;
     }
 
+    if (!itemNameInput.trim()) {
+      toast.error('Product name is required');
+      return;
+    }
+
+    if (priceInput && Number.isNaN(Number(priceInput))) {
+      toast.error('Price must be a valid number');
+      return;
+    }
+
+    if (rrpInput && Number.isNaN(Number(rrpInput))) {
+      toast.error('RRP must be a valid number');
+      return;
+    }
+
     try {
       setSaving(true);
-      await adminListItemsService.updateCaseBarcode(editingItem.itemId, caseBarcodeInput);
-      toast.success('Case barcode updated globally');
+      await adminListItemsService.updateListItem({
+        itemId: editingItem.itemId,
+        shopId: editingItem.shopId,
+        title: itemNameInput,
+        barcode: barcodeInput,
+        caseBarcode: caseBarcodeInput,
+        price: priceInput,
+        rrp: rrpInput,
+        caseSize: caseSizeInput,
+        packetSize: packetSizeInput,
+        retailSize: retailSizeInput,
+        category: categoryInput,
+      });
+      toast.success('Item updated successfully');
       setIsEditOpen(false);
-      setScannerOpen(false);
+      setBarcodeScannerOpen(false);
+      setCaseBarcodeScannerOpen(false);
       await loadItems();
     } catch (error) {
-      console.error('Failed to update case barcode:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update case barcode');
+      console.error('Failed to update list item:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update item');
     } finally {
       setSaving(false);
     }
@@ -510,41 +568,85 @@ const ItemsInUserList = () => {
         open={isEditOpen}
         onOpenChange={(open) => {
           setIsEditOpen(open);
-          if (!open) setScannerOpen(false);
+          if (!open) {
+            setBarcodeScannerOpen(false);
+            setCaseBarcodeScannerOpen(false);
+          }
         }}
       >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Update Case Barcode</DialogTitle>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>Edit Item Details</DialogTitle>
             <DialogDescription>
-              This updates the global case barcode for the item across all user lists.
+              Update product details for this item across user lists. Barcode scans auto-fill the form.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="space-y-3 overflow-y-auto pr-1">
             <div className="text-sm font-medium text-gray-800 dark:text-gray-200">{editingItem?.itemName}</div>
 
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                type="button"
-                variant="outline"
-                className="sm:w-auto"
-                onClick={() => setScannerOpen((prev) => !prev)}
-              >
-                <ScanLine className="mr-2 h-4 w-4" />
-                {scannerOpen ? 'Hide Scanner' : 'Scan Barcode'}
-              </Button>
-              <div className="text-xs text-gray-500 sm:self-center">Scan auto-fills input. You can also type manually.</div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Product Name</label>
+              <Input
+                value={itemNameInput}
+                onChange={(e) => setItemNameInput(e.target.value)}
+                placeholder="Enter product name"
+              />
             </div>
 
-            {scannerOpen && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Barcode</label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={barcodeInput}
+                    onChange={(e) => setBarcodeInput(e.target.value)}
+                    placeholder="Scan or enter barcode"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setBarcodeScannerOpen((prev) => !prev)}
+                  >
+                    <ScanLine className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Case Barcode</label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={caseBarcodeInput}
+                    onChange={(e) => setCaseBarcodeInput(e.target.value)}
+                    placeholder="Scan or enter case barcode"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCaseBarcodeScannerOpen((prev) => !prev)}
+                  >
+                    <ScanLine className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {(barcodeScannerOpen || caseBarcodeScannerOpen) && (
               <div className="rounded-md border p-2">
                 <OptimizedScanner
                   onScan={(result) => {
                     if (!result) return;
-                    setCaseBarcodeInput(result);
-                    setScannerOpen(false);
-                    toast.success(`Scanned and auto-filled: ${result}`);
+                    if (barcodeScannerOpen) {
+                      setBarcodeInput(result);
+                      setBarcodeScannerOpen(false);
+                    } else {
+                      setCaseBarcodeInput(result);
+                      setCaseBarcodeScannerOpen(false);
+                    }
+                    toast.success(`Scanned: ${result}`);
                   }}
                   onError={(error) => {
                     toast.error(error.message || 'Scanner error');
@@ -554,19 +656,70 @@ const ItemsInUserList = () => {
               </div>
             )}
 
-            <Input
-              value={caseBarcodeInput}
-              onChange={(e) => setCaseBarcodeInput(e.target.value)}
-              placeholder="Scan or enter case barcode manually"
-            />
-            <p className="text-xs text-gray-500">Leave empty to clear barcode.</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Price</label>
+                <Input
+                  inputMode="numeric"
+                  placeholder="Enter Price (e.g. 456 = £4.56)"
+                  value={priceInput}
+                  onChange={(e) => handlePriceChange(e.target.value, setPriceInput)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-300">RRP</label>
+                <Input
+                  inputMode="numeric"
+                  placeholder="Enter RRP (e.g. 456 = £4.56)"
+                  value={rrpInput}
+                  onChange={(e) => handlePriceChange(e.target.value, setRrpInput)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Case Size</label>
+                <Input
+                  value={caseSizeInput}
+                  onChange={(e) => setCaseSizeInput(e.target.value)}
+                  placeholder="e.g. 12 x 500ml"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Packet Size</label>
+                <Input
+                  value={packetSizeInput}
+                  onChange={(e) => setPacketSizeInput(e.target.value)}
+                  placeholder="e.g. 1 x 12"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Retail Size</label>
+                <Input
+                  value={retailSizeInput}
+                  onChange={(e) => setRetailSizeInput(e.target.value)}
+                  placeholder="e.g. 500ml"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Category</label>
+              <CategorySelect
+                value={categoryInput}
+                onChange={setCategoryInput}
+                placeholder="Select category"
+              />
+            </div>
+
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={saveCaseBarcode} disabled={saving}>
+            <Button onClick={saveItemDetails} disabled={saving}>
               {saving ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>

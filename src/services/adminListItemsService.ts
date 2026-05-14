@@ -9,12 +9,79 @@ export interface ListItemSummary {
   barcode: string | null;
   caseBarcode: string | null;
   img?: string | string[] | { url?: string } | null;
+  price?: number | string | null;
+  caseSize?: string | null;
+  packetSize?: string | null;
+  retailSize?: string | null;
+  rrp?: number | string | null;
+  category?: string | null;
   shopId: string;
   shopName: string;
   aisle: string;
   aisleValue: string;
   listCount: number;
   lastUpdated: string | null;
+}
+
+export interface ListItemUpdatePayload {
+  itemId: string;
+  shopId?: string;
+  title?: string;
+  barcode?: string;
+  caseBarcode?: string;
+  caseSize?: string;
+  packetSize?: string;
+  retailSize?: string;
+  rrp?: number | string | null;
+  category?: string;
+  price?: number | string | null;
+}
+
+export interface ProductLookupResponse {
+  success: boolean;
+  data: {
+    id: string;
+    title: string;
+    barcode: string | null;
+    caseBarcode: string | null;
+    caseSize: string | null;
+    packetSize: string | null;
+    retailSize: string | null;
+    rrp: number | string | null;
+    category: string | null;
+  };
+}
+
+export interface ListItemUpdateLog {
+  id: string;
+  timestamp: string;
+  product: {
+    id: string;
+    title: string;
+    barcode: string | null;
+    caseBarcode: string | null;
+    caseSize: string | null;
+    packetSize: string | null;
+    retailSize: string | null;
+    rrp: number | string | null;
+    category: string | null;
+  };
+  shop: {
+    id: string;
+    name: string;
+  };
+  beforeData: Record<string, unknown> | null;
+  afterData: Record<string, unknown> | null;
+}
+
+export interface ListItemUpdateSummary {
+  rangeDays: number;
+  totalUnique: number;
+  byDate: Array<{
+    date: string;
+    uniqueProducts: number;
+    totalEdits: number;
+  }>;
 }
 
 export interface ListItemsFilterOption {
@@ -97,6 +164,57 @@ class AdminListItemsService {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.error || 'Failed to update case barcode');
     }
+  }
+
+  async updateListItem(payload: ListItemUpdatePayload): Promise<void> {
+    const response = await fetch(`${API_BASE}${API_CONFIG.ADMIN.UPDATE_LIST_ITEM}`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to update list item');
+    }
+  }
+
+  async getProductByBarcode(barcode: string, field?: 'barcode' | 'caseBarcode'): Promise<ProductLookupResponse> {
+    const params = field ? `?field=${encodeURIComponent(field)}` : '';
+    const response = await fetch(`${API_BASE}${API_CONFIG.PRODUCT.GET_BY_BARCODE(barcode)}${params}`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Product not found');
+    }
+
+    return response.json();
+  }
+
+  async getEmployeeListItemUpdates(
+    employeeId: number,
+    limit = 25,
+    summaryDays = 30
+  ): Promise<{ logs: ListItemUpdateLog[]; summary: ListItemUpdateSummary | null }> {
+    const response = await fetch(
+      `${API_BASE}${API_CONFIG.ADMIN.EMPLOYEE_LIST_ITEM_UPDATES(employeeId)}?limit=${limit}&summaryDays=${summaryDays}`,
+      {
+        headers: this.getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to fetch list item updates');
+    }
+
+    const data = await response.json();
+    return {
+      logs: data.data || [],
+      summary: data.summary || null
+    };
   }
 }
 

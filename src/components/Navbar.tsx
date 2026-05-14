@@ -130,6 +130,7 @@ export const Navbar = () => {
     { icon: Grid, label: "Dashboard", path: "/employee-dashboard" },
     { icon: Box, label: "Products", path: "/products" },
     { icon: Store, label: "Shops", path: "/shops" },
+    { icon: ListTree, label: "Items in User List", path: "/items-in-user-list" },
     { icon: AlertTriangle, label: "Price Corrections", path: "/price-corrections" },
   ];
 

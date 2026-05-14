@@ -192,7 +192,7 @@ const App = () => (
                   </ProtectedRoute>
                 } />
                 <Route path="/items-in-user-list" element={
-                  <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE"]}>
                     <ItemsInUserList />
                   </ProtectedRoute>
                 } />

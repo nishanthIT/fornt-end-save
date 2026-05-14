@@ -10,6 +10,8 @@ export const API_CONFIG = {
     PROCESS_EXPIRED_TRIALS: '/admin/process-expired-trials',
     LIST_ITEMS: '/admin/list-items',
     UPDATE_LIST_ITEM_CASE_BARCODE: '/admin/list-items/case-barcode',
+    UPDATE_LIST_ITEM: '/admin/list-items',
+    EMPLOYEE_LIST_ITEM_UPDATES: (employeeId: number) => `/admin/employees/${employeeId}/list-item-updates`,
   },
   
   // Auth endpoints
@@ -37,6 +39,7 @@ export const API_CONFIG = {
     FILTER: '/filterProducts',
     ADD_TO_SHOP: '/addProductAtShop',
     ADD_EXISTING_TO_SHOP: '/addProductAtShopifExistAtProduct',
+    GET_BY_BARCODE: (barcode: string) => `/getProductByBarcode/${barcode}`,
   },
   
   // Employee endpoints
