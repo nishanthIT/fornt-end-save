@@ -78,6 +78,18 @@ const Products = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(false);
   const [pendingProducts, setPendingProducts] = useState<any[]>([]);
+  const [addedProducts, setAddedProducts] = useState<any[]>([]);
+  const [selectedPendingId, setSelectedPendingId] = useState<string | null>(null);
+  const [pendingEdits, setPendingEdits] = useState<Record<string, {
+    title?: string;
+    barcode?: string;
+    retailSize?: string;
+    rrp?: string;
+    caseSize?: string;
+    packetSize?: string;
+    caseBarcode?: string;
+    category?: string;
+  }>>({});
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState<string | null>(null);
   const [approvingPendingId, setApprovingPendingId] = useState<string | null>(null);
@@ -141,10 +153,16 @@ const Products = () => {
     }
   }, [isPendingDialogOpen, fetchPendingProducts]);
 
-  const approvePendingProduct = async (productId: string) => {
+  const approvePendingProduct = async (product: any) => {
+    const productId = product.id as string;
     if (approvingPendingId) return;
     setApprovingPendingId(productId);
     try {
+      const edits = pendingEdits[productId] || {};
+      const normalizedCategory = (edits.category ?? product.category ?? '').trim();
+      const approvedCategory = normalizedCategory && normalizedCategory !== 'USER_SUBMITTED_PENDING'
+        ? normalizedCategory
+        : 'Uncategorized';
       const authToken = localStorage.getItem('auth_token');
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/products/pending-submissions/${productId}/approve`, {
         method: 'PUT',
@@ -154,7 +172,14 @@ const Products = () => {
         },
         credentials: 'include',
         body: JSON.stringify({
-          category: 'Uncategorized',
+          title: edits.title ?? product.title,
+          barcode: edits.barcode ?? product.barcode,
+          retailSize: edits.retailSize ?? product.retailSize,
+          rrp: edits.rrp ?? product.rrp,
+          caseSize: edits.caseSize ?? product.caseSize,
+          packetSize: edits.packetSize ?? product.packetSize,
+          caseBarcode: edits.caseBarcode ?? product.caseBarcode,
+          category: approvedCategory,
         }),
       });
 
@@ -164,8 +189,26 @@ const Products = () => {
       }
 
       toast.success('Product approved and moved to database');
+      const approvedSnapshot = {
+        ...product,
+        title: edits.title ?? product.title,
+        barcode: edits.barcode ?? product.barcode,
+        retailSize: edits.retailSize ?? product.retailSize,
+        rrp: edits.rrp ?? product.rrp,
+        caseSize: edits.caseSize ?? product.caseSize,
+        packetSize: edits.packetSize ?? product.packetSize,
+        caseBarcode: edits.caseBarcode ?? product.caseBarcode,
+        category: approvedCategory,
+      };
+
+      setAddedProducts((prev) => [approvedSnapshot, ...prev]);
       // Optimistic UI: remove immediately from pending list
       setPendingProducts((prev) => prev.filter((item) => item.id !== productId));
+      setPendingEdits((prev) => {
+        const next = { ...prev };
+        delete next[productId];
+        return next;
+      });
       // Keep data in sync in background
       fetchPendingProducts();
       refetch();
@@ -176,6 +219,31 @@ const Products = () => {
       setApprovingPendingId(null);
     }
   };
+
+  const updatePendingEdit = (productId: string, field: string, value: string) => {
+    setPendingEdits((prev) => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const togglePendingDetails = (productId: string) => {
+    setSelectedPendingId((prev) => (prev === productId ? null : productId));
+  };
+
+  const pendingList = pendingProducts.filter((product) => !product.alreadyAdded);
+  const addedList = [...pendingProducts.filter((product) => product.alreadyAdded), ...addedProducts].reduce(
+    (acc: any[], product) => {
+      if (!acc.some((item) => item.id === product.id)) {
+        acc.push(product);
+      }
+      return acc;
+    },
+    []
+  );
 
   // Image compression function
   const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.8): Promise<File> => {
@@ -1039,31 +1107,136 @@ const Products = () => {
               These are products users added from barcode scan when not found.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-6 max-h-[60vh] overflow-y-auto">
             {pendingLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
             {!pendingLoading && pendingError && (
               <p className="text-sm text-red-600">{pendingError}</p>
             )}
-            {!pendingLoading && !pendingError && pendingProducts.length === 0 && (
+            {!pendingLoading && !pendingError && pendingList.length === 0 && (
               <p className="text-sm text-muted-foreground">No pending products.</p>
             )}
 
-            {pendingProducts.map((product) => (
-                <div key={product.id} className="border rounded-md p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div>
+            {!pendingLoading && !pendingError && pendingList.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Pending Products</p>
+                {pendingList.map((product) => (
+                  <div key={product.id} className="border rounded-md p-3 flex flex-col gap-3">
+                    <button
+                      type="button"
+                      onClick={() => togglePendingDetails(product.id)}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-left"
+                    >
+                      <div>
+                        <p className="font-semibold">{product.title}</p>
+                        <p className="text-xs text-muted-foreground">Barcode: {product.barcode || 'N/A'}</p>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {selectedPendingId === product.id ? 'Hide details' : 'Edit & save'}
+                      </span>
+                    </button>
+
+                    {selectedPendingId === product.id && (
+                    <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">Product Name</label>
+                        <Input
+                          value={pendingEdits[product.id]?.title ?? product.title ?? ''}
+                          onChange={(e) => updatePendingEdit(product.id, 'title', e.target.value.toUpperCase())}
+                          className="uppercase"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">Barcode</label>
+                        <Input
+                          value={pendingEdits[product.id]?.barcode ?? product.barcode ?? ''}
+                          onChange={(e) => updatePendingEdit(product.id, 'barcode', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">Retail Size</label>
+                        <Input
+                          value={pendingEdits[product.id]?.retailSize ?? product.retailSize ?? ''}
+                          onChange={(e) => updatePendingEdit(product.id, 'retailSize', e.target.value.toUpperCase())}
+                          className="uppercase"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">RRP (e.g. 456 = £4.56)</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                          <Input
+                            className="pl-7"
+                            placeholder="0.00"
+                            value={pendingEdits[product.id]?.rrp ?? product.rrp ?? ''}
+                            onChange={(e) => handlePriceInputChange(e.target.value, (val) => updatePendingEdit(product.id, 'rrp', val))}
+                            inputMode="numeric"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">Case Size</label>
+                        <Input
+                          value={pendingEdits[product.id]?.caseSize ?? product.caseSize ?? ''}
+                          onChange={(e) => updatePendingEdit(product.id, 'caseSize', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">Packet Size</label>
+                        <Input
+                          value={pendingEdits[product.id]?.packetSize ?? product.packetSize ?? ''}
+                          onChange={(e) => updatePendingEdit(product.id, 'packetSize', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">Case Barcode</label>
+                        <Input
+                          value={pendingEdits[product.id]?.caseBarcode ?? product.caseBarcode ?? ''}
+                          onChange={(e) => updatePendingEdit(product.id, 'caseBarcode', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">Category</label>
+                        <select
+                          value={pendingEdits[product.id]?.category ?? product.category ?? ''}
+                          onChange={(e) => updatePendingEdit(product.id, 'category', e.target.value)}
+                          className="w-full h-9 px-3 py-1.5 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        >
+                          <option value="">Uncategorized</option>
+                          {availableCategories.map((cat) => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        onClick={() => approvePendingProduct(product)}
+                        disabled={approvingPendingId === product.id}
+                      >
+                        {approvingPendingId === product.id ? 'Adding...' : 'Save To Database'}
+                      </Button>
+                    </div>
+                    </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!pendingLoading && !pendingError && addedList.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Added Products</p>
+                {addedList.map((product) => (
+                  <div key={product.id} className="border rounded-md p-3">
                     <p className="font-semibold">{product.title}</p>
                     <p className="text-xs text-muted-foreground">Barcode: {product.barcode || 'N/A'}</p>
                     <p className="text-xs text-muted-foreground">Size: {product.retailSize || 'N/A'}</p>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => approvePendingProduct(product.id)}
-                    disabled={approvingPendingId === product.id}
-                  >
-                    {approvingPendingId === product.id ? 'Adding...' : 'Add To Database'}
-                  </Button>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

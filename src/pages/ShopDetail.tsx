@@ -6,7 +6,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Store, Phone, MapPin, Plus, Save, PlusCircle, Barcode, Search, Camera, Upload, X, Gift } from "lucide-react";
+import { Store, Phone, MapPin, Plus, Save, PlusCircle, Barcode, Search, Camera, Upload, X, Gift, ArrowRightLeft, Loader2 } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductCardshop } from "@/components/ProductCardShop";
 import { ProductAtShopCard } from "@/components/ProductAtShopCard";
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import useFetchProducts from "@/hooks/useFetchProducts";
 import useFetchProductsAtShop from "@/hooks/useFetchProductsAtShop";
 import useFetchShopById from "@/hooks/useFetchShopById";
+import useFetchShops from "@/hooks/useFetchShops";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,7 @@ const ShopDetail = () => {
   const [retailSize, setRetailSize] = useState("");
   const [price, setPrice] = useState("");
   const [Aiel, setAiel] = useState("");
+  const [locationCode, setLocationCode] = useState("");
   const [rrp, setRrp] = useState("");
   const [category, setCategory] = useState("");
   const [image, setImage] = useState(null);
@@ -73,6 +75,7 @@ const ShopDetail = () => {
   const [addProductCaseBarcode, setAddProductCaseBarcode] = useState("");
   const [addProductPrice, setAddProductPrice] = useState("");
   const [addProductAiel, setAddProductAiel] = useState("");
+  const [addProductLocationCode, setAddProductLocationCode] = useState("");
   const [addProductRrp, setAddProductRrp] = useState("");
   const [addProductcaseSize , setAddProductcaseSize ] = useState("");
   const [addProductpacketSize, setAddProductpacketSize] = useState("");
@@ -98,6 +101,23 @@ const ShopDetail = () => {
   const [bulkEditType, setBulkEditType] = useState<"fixed" | "increase" | "decrease">("fixed");
   const [bulkEditValue, setBulkEditValue] = useState("");
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+
+  // Transfer products state
+  const [isTransferMode, setIsTransferMode] = useState(false);
+  const [isPreparingTransferSelection, setIsPreparingTransferSelection] = useState(false);
+  const [allTransferProductIds, setAllTransferProductIds] = useState<string[]>([]);
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const [transferDestinationShopId, setTransferDestinationShopId] = useState("");
+  const [copyTransferPrice, setCopyTransferPrice] = useState(false);
+  const [copyTransferAisle, setCopyTransferAisle] = useState(false);
+  const [copyTransferLocationCode, setCopyTransferLocationCode] = useState(false);
+  const [duplicateStrategy, setDuplicateStrategy] = useState<"skip" | "replace">("skip");
+  const [isTransferringProducts, setIsTransferringProducts] = useState(false);
+  const [transferSummary, setTransferSummary] = useState<{
+    transferred: number;
+    skipped: number;
+    failed: number;
+  } | null>(null);
 
   // Ref to store scroll position for restoration after product updates
   const savedScrollPositionRef = useRef<number | null>(null);
@@ -237,6 +257,7 @@ const ShopDetail = () => {
     stockStatus: filterStockStatus
   });
   const { shop, loading: shopLoading, error: shopError } = useFetchShopById(id);
+  const { shops } = useFetchShops();
 
   const [products, setProducts] = useState([]);
 
@@ -323,6 +344,7 @@ const ShopDetail = () => {
     if (caseBarcode) formData.append('casebarcode', caseBarcode);
     if (price) formData.append('price', String(parseFloat(price) || 0));
     if (Aiel) formData.append('aiel', Aiel);
+    if (locationCode) formData.append('locationCode', locationCode);
     if (finalRrp) formData.append('rrp', String(parseFloat(finalRrp) || 0));
     if (category) formData.append('category', category);
     if (imageFile) formData.append('image', imageFile);
@@ -334,6 +356,7 @@ const ShopDetail = () => {
     setRetailSize("");
     setPrice("");
     setAiel("");
+    setLocationCode("");
     setRrp("");
     setCategory("");
     setCaseBarcode("");
@@ -425,6 +448,7 @@ const ShopDetail = () => {
     setAddProductCaseBarcode(product.caseBarcode || "");
     setAddProductPrice(product.price || "");
     setAddProductAiel("");
+    setAddProductLocationCode("");
     setAddProductRrp(product.rrp || "");
     setAddProductpacketSize(product.packetSize || ""); 
     setAddProductcaseSize(product.caseSize || ""); 
@@ -487,6 +511,7 @@ const ShopDetail = () => {
     const capturedAddProductCaseBarcode = addProductCaseBarcode;
     const capturedAddProductPrice = addProductPrice;
     const capturedAddProductAiel = addProductAiel;
+    const capturedAddProductLocationCode = addProductLocationCode;
     const capturedAddProductpacketSize = addProductpacketSize;
     const capturedAddProductcaseSize = addProductcaseSize;
     const capturedAddProductCategory = addProductCategory;
@@ -510,6 +535,7 @@ const ShopDetail = () => {
         if (capturedAddProductCaseBarcode) formData.append('casebarcode', capturedAddProductCaseBarcode);
         if (capturedAddProductPrice) formData.append('price', String(parseFloat(capturedAddProductPrice) || 0));
         if (capturedAddProductAiel) formData.append('aiel', capturedAddProductAiel);
+        if (capturedAddProductLocationCode) formData.append('locationCode', capturedAddProductLocationCode);
         if (finalRrp) formData.append('rrp', String(parseFloat(finalRrp) || 0));
         if (capturedAddProductpacketSize) formData.append('packetSize', capturedAddProductpacketSize);
         if (capturedAddProductcaseSize) formData.append('caseSize', capturedAddProductcaseSize);
@@ -545,6 +571,7 @@ const ShopDetail = () => {
           ...(capturedAddProductCaseBarcode && { casebarcode: capturedAddProductCaseBarcode }),
           ...(capturedAddProductPrice && { price: parseFloat(capturedAddProductPrice) || 0 }),
           ...(capturedAddProductAiel && { aiel: capturedAddProductAiel }),
+          ...(capturedAddProductLocationCode && { locationCode: capturedAddProductLocationCode }),
           ...(finalRrp && { rrp: parseFloat(finalRrp) || 0 }),
           ...(capturedAddProductpacketSize && { packetSize: capturedAddProductpacketSize }),
           ...(capturedAddProductcaseSize && { caseSize: capturedAddProductcaseSize }),
@@ -631,6 +658,331 @@ const ShopDetail = () => {
     handleSavePrice(productId, regularPrice, offerPrice, offerExpiryDate);
   };
 
+  const destinationShops = (shops || []).filter((shopOption: any) => shopOption.id !== id);
+
+  const resetTransferOptions = () => {
+    setTransferDestinationShopId("");
+    setCopyTransferPrice(false);
+    setCopyTransferAisle(false);
+    setCopyTransferLocationCode(false);
+    setDuplicateStrategy("skip");
+    setTransferSummary(null);
+  };
+
+  const startTransferSelection = async () => {
+    if (!id) {
+      return;
+    }
+
+    setIsPreparingTransferSelection(true);
+    setTransferSummary(null);
+
+    try {
+      const authToken = localStorage.getItem("auth_token");
+      const productIdsUrl = `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${id}/product-ids`;
+      const commonRequestOptions = {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken && { Authorization: `Bearer ${authToken}` }),
+        },
+        credentials: "include" as const,
+      };
+
+      let allIds: string[] = [];
+      const response = await fetch(productIdsUrl, commonRequestOptions);
+
+      if (response.ok) {
+        const payload = await response.json();
+        allIds = Array.isArray(payload.productIds) ? payload.productIds : [];
+      } else {
+        // Fallback for environments where the new product-ids endpoint is not deployed yet.
+        const firstPageUrl = `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${id}/products?page=1`;
+        const firstPageResponse = await fetch(firstPageUrl, commonRequestOptions);
+
+        if (!firstPageResponse.ok) {
+          const errorPayload = await firstPageResponse.json().catch(() => ({}));
+          throw new Error(errorPayload.error || "Failed to load products for transfer");
+        }
+
+        const firstPagePayload = await firstPageResponse.json();
+        const totalPages = Number(firstPagePayload.totalPages) || 1;
+        const collectedIds = new Set<string>(
+          Array.isArray(firstPagePayload.products)
+            ? firstPagePayload.products.map((product: any) => product.productId).filter(Boolean)
+            : []
+        );
+
+        if (totalPages > 1) {
+          const pageRequests = Array.from({ length: totalPages - 1 }, (_, index) => index + 2);
+          const pageResponses = await Promise.all(
+            pageRequests.map((pageNumber) =>
+              fetch(
+                `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${id}/products?page=${pageNumber}`,
+                commonRequestOptions
+              )
+            )
+          );
+
+          const pagePayloads = await Promise.all(
+            pageResponses.map(async (pageResponse) => {
+              if (!pageResponse.ok) {
+                return { products: [] };
+              }
+              return pageResponse.json();
+            })
+          );
+
+          pagePayloads.forEach((pagePayload) => {
+            if (Array.isArray(pagePayload.products)) {
+              pagePayload.products.forEach((product: any) => {
+                if (product?.productId) {
+                  collectedIds.add(product.productId);
+                }
+              });
+            }
+          });
+        }
+
+        allIds = Array.from(collectedIds);
+      }
+
+      if (allIds.length === 0) {
+        toast.info("No products found in this shop to transfer");
+        return;
+      }
+
+      setIsSelectionMode(true);
+      setIsTransferMode(true);
+      setAllTransferProductIds(allIds);
+      setSelectedProductIds(allIds);
+      resetTransferOptions();
+      toast.success(`Selected ${allIds.length} products for transfer`);
+    } catch (error: any) {
+      console.error("Transfer selection error:", error);
+      toast.error(error.message || "Failed to prepare transfer selection");
+    } finally {
+      setIsPreparingTransferSelection(false);
+    }
+  };
+
+  const openTransferDialog = () => {
+    if (selectedProductIds.length === 0) {
+      toast.error("Select at least one product to transfer");
+      return;
+    }
+    setShowTransferDialog(true);
+  };
+
+  const fetchAllProductsForShop = async (shopId: string, authToken: string | null) => {
+    const commonRequestOptions = {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken && { Authorization: `Bearer ${authToken}` }),
+      },
+      credentials: "include" as const,
+    };
+
+    const firstPageResponse = await fetch(
+      `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${shopId}/products?page=1`,
+      commonRequestOptions
+    );
+
+    if (!firstPageResponse.ok) {
+      const payload = await firstPageResponse.json().catch(() => ({}));
+      throw new Error(payload.error || "Failed to load products");
+    }
+
+    const firstPagePayload = await firstPageResponse.json();
+    const totalPages = Number(firstPagePayload.totalPages) || 1;
+    const mergedProducts: any[] = Array.isArray(firstPagePayload.products) ? [...firstPagePayload.products] : [];
+
+    if (totalPages > 1) {
+      const pageNumbers = Array.from({ length: totalPages - 1 }, (_, index) => index + 2);
+      const responses = await Promise.all(
+        pageNumbers.map((page) =>
+          fetch(
+            `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${shopId}/products?page=${page}`,
+            commonRequestOptions
+          )
+        )
+      );
+
+      const payloads = await Promise.all(
+        responses.map(async (response) => {
+          if (!response.ok) return { products: [] };
+          return response.json();
+        })
+      );
+
+      payloads.forEach((payload) => {
+        if (Array.isArray(payload.products)) {
+          mergedProducts.push(...payload.products);
+        }
+      });
+    }
+
+    return mergedProducts;
+  };
+
+  const executeLegacyTransfer = async (authToken: string | null) => {
+    if (!id) {
+      return { transferred: 0, skipped: 0, failed: selectedProductIds.length };
+    }
+
+    const sourceProducts = await fetchAllProductsForShop(id, authToken);
+    const destinationProducts = await fetchAllProductsForShop(transferDestinationShopId, authToken);
+
+    const sourceById = new Map(sourceProducts.map((product: any) => [product.productId, product]));
+    const destinationSet = new Set(destinationProducts.map((product: any) => product.productId));
+
+    let transferred = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+    const transferTargets = selectedProductIds.map((productId) => {
+      const source = sourceById.get(productId);
+      if (!source) {
+        return { productId, action: "skip" as const, reason: "missing-source" };
+      }
+
+      const existsInDestination = destinationSet.has(productId);
+      if (existsInDestination && duplicateStrategy === "skip") {
+        return { productId, action: "skip" as const, reason: "duplicate-skip" };
+      }
+
+      if (
+        existsInDestination &&
+        duplicateStrategy === "replace" &&
+        !copyTransferPrice &&
+        !copyTransferAisle &&
+        !copyTransferLocationCode
+      ) {
+        return { productId, action: "skip" as const, reason: "replace-no-fields" };
+      }
+
+      const body: any = {
+        shopId: transferDestinationShopId,
+        id: productId,
+        employeeId,
+      };
+
+      if (copyTransferPrice) {
+        body.price = Number(source.price);
+      }
+      if (copyTransferAisle) {
+        body.aiel = source.aiel || null;
+      }
+      if (copyTransferLocationCode) {
+        body.locationCode = source.locationCode || null;
+      }
+
+      return { productId, action: "upsert" as const, body };
+    });
+
+    const upserts = transferTargets.filter((item) => item.action === "upsert");
+    skipped += transferTargets.length - upserts.length;
+
+    const chunkSize = 20;
+    for (let i = 0; i < upserts.length; i += chunkSize) {
+      const chunk = upserts.slice(i, i + chunkSize);
+      const chunkResults = await Promise.allSettled(
+        chunk.map((item) =>
+          fetch(`${apiBase}/addProductAtShopifExistAtProduct`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(authToken && { Authorization: `Bearer ${authToken}` }),
+            },
+            credentials: "include",
+            body: JSON.stringify(item.body),
+          })
+        )
+      );
+
+      chunkResults.forEach((result) => {
+        if (result.status === "fulfilled" && result.value.ok) {
+          transferred += 1;
+        } else {
+          failed += 1;
+        }
+      });
+    }
+
+    return { transferred, skipped, failed };
+  };
+
+  const executeTransferProducts = async () => {
+    if (!id) {
+      return;
+    }
+
+    if (!transferDestinationShopId) {
+      toast.error("Please select a destination shop");
+      return;
+    }
+
+    if (selectedProductIds.length === 0) {
+      toast.error("No products selected for transfer");
+      return;
+    }
+
+    setIsTransferringProducts(true);
+    setTransferSummary(null);
+
+    try {
+      const authToken = localStorage.getItem("auth_token");
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/transfer-products`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken && { Authorization: `Bearer ${authToken}` }),
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            sourceShopId: id,
+            destinationShopId: transferDestinationShopId,
+            productIds: selectedProductIds,
+            copyPrice: copyTransferPrice,
+            copyAisleNumber: copyTransferAisle,
+            copyLocationCode: copyTransferLocationCode,
+            duplicateStrategy,
+          }),
+        }
+      );
+
+      const payload = await response.json().catch(() => ({}));
+
+      let summary;
+
+      if (response.ok) {
+        summary = {
+          transferred: Number(payload.transferred) || 0,
+          skipped: Number(payload.skipped) || 0,
+          failed: Number(payload.failed) || 0,
+        };
+      } else if (response.status === 404) {
+        // Compatibility fallback for older backend instances that don't yet expose /shop/transfer-products.
+        summary = await executeLegacyTransfer(authToken);
+      } else {
+        throw new Error(payload.error || `Transfer failed (${response.status})`);
+      }
+
+      setTransferSummary(summary);
+      toast.success(`Transfer complete. Transferred: ${summary.transferred}, Skipped: ${summary.skipped}, Failed: ${summary.failed}`);
+      silentRefetchProductsAtShop();
+    } catch (error: any) {
+      console.error("Transfer products error:", error);
+      toast.error(error.message || "Failed to transfer products");
+    } finally {
+      setIsTransferringProducts(false);
+    }
+  };
+
   const startSelectionMode = (productId: string) => {
     setIsSelectionMode(true);
     setSelectedProductIds((prev) => (prev.includes(productId) ? prev : [...prev, productId]));
@@ -646,8 +998,12 @@ const ShopDetail = () => {
 
   const cancelSelectionMode = () => {
     setIsSelectionMode(false);
+    setIsTransferMode(false);
     setSelectedProductIds([]);
     setShowBulkPriceDialog(false);
+    setShowTransferDialog(false);
+    setAllTransferProductIds([]);
+    resetTransferOptions();
   };
 
   const toggleSelectAllVisible = () => {
@@ -840,14 +1196,20 @@ const ShopDetail = () => {
 
   useEffect(() => {
     setSelectedProductIds((prev) => {
+      if (isTransferMode) {
+        return prev;
+      }
       const existing = new Set((products || []).map((product) => product.productId));
       return prev.filter((id) => existing.has(id));
     });
-  }, [products]);
+  }, [products, isTransferMode]);
 
   useEffect(() => {
+    if (isTransferMode) {
+      return;
+    }
     cancelSelectionMode();
-  }, [availableProductsPage, availableProductsSearch, filterCategory, filterAisle, filterStockStatus]);
+  }, [availableProductsPage, availableProductsSearch, filterCategory, filterAisle, filterStockStatus, isTransferMode]);
 
   return (
     <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-6">
@@ -871,6 +1233,28 @@ const ShopDetail = () => {
                 <Gift className="mr-1 sm:mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Bundle Offers</span>
                 <span className="sm:hidden">Bundles</span>
+              </Button>
+
+              {/* Transfer Products */}
+              <Button
+                size="sm"
+                variant={isTransferMode ? "default" : "outline"}
+                className="flex-shrink-0"
+                onClick={startTransferSelection}
+                disabled={isPreparingTransferSelection || productsAtShopLoading}
+              >
+                {isPreparingTransferSelection ? (
+                  <>
+                    <Loader2 className="mr-1 sm:mr-2 h-4 w-4 animate-spin" />
+                    Selecting...
+                  </>
+                ) : (
+                  <>
+                    <ArrowRightLeft className="mr-1 sm:mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">Transfer Products</span>
+                    <span className="sm:hidden">Transfer</span>
+                  </>
+                )}
               </Button>
 
               {/* Add New Product Dialog */}
@@ -974,8 +1358,22 @@ const ShopDetail = () => {
                     />
                   </div>
 
-                  {/* Aisle No */}
-                  <Input type="text" placeholder="Aisle No" value={Aiel} onChange={(e) => setAiel(e.target.value)} />
+                  {/* Aisle + Location Code */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-sm text-muted-foreground">Aisle Number</label>
+                      <Input type="text" placeholder="Aisle Number" value={Aiel} onChange={(e) => setAiel(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm text-muted-foreground">Location Code</label>
+                      <Input
+                        type="text"
+                        placeholder="L3, R2, M1"
+                        value={locationCode}
+                        onChange={(e) => setLocationCode(e.target.value)}
+                      />
+                    </div>
+                  </div>
 
                   {/* RRP */}
                   <div className="relative">
@@ -1362,19 +1760,46 @@ const ShopDetail = () => {
             <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm font-medium text-blue-900">
-                  {selectedProductIds.length} item{selectedProductIds.length === 1 ? "" : "s"} selected
+                  {isTransferMode
+                    ? `Selected: ${selectedProductIds.length} Product${selectedProductIds.length === 1 ? "" : "s"}`
+                    : `${selectedProductIds.length} item${selectedProductIds.length === 1 ? "" : "s"} selected`}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={toggleSelectAllVisible}>
-                    {allVisibleSelected ? "Unselect All" : "Select All"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => setShowBulkPriceDialog(true)}
-                    disabled={selectedProductIds.length === 0}
-                  >
-                    Edit Price
-                  </Button>
+                  {isTransferMode ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSelectedProductIds(allTransferProductIds)}
+                        disabled={allTransferProductIds.length === 0}
+                      >
+                        Select All Shop Products
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={toggleSelectAllVisible}>
+                        {allVisibleSelected ? "Unselect Visible" : "Select Visible"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={openTransferDialog}
+                        disabled={selectedProductIds.length === 0}
+                      >
+                        Start Transfer
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button size="sm" variant="outline" onClick={toggleSelectAllVisible}>
+                        {allVisibleSelected ? "Unselect All" : "Select All"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => setShowBulkPriceDialog(true)}
+                        disabled={selectedProductIds.length === 0}
+                      >
+                        Edit Price
+                      </Button>
+                    </>
+                  )}
                   <Button size="sm" variant="ghost" onClick={cancelSelectionMode}>
                     Cancel Selection
                   </Button>
@@ -1383,7 +1808,7 @@ const ShopDetail = () => {
             </div>
           ) : (
             <p className="mb-3 text-xs text-muted-foreground sm:text-sm">
-              Long press any product card to enable multi-select and bulk price editing.
+              Long press any product card to enable multi-select and bulk price editing. Use Transfer Products to select all shop products across pages.
             </p>
           )}
           
@@ -1407,6 +1832,7 @@ const ShopDetail = () => {
                     offerPrice={product.offerPrice ? Number(product.offerPrice) : undefined}
                     offerExpiryDate={product.offerExpiryDate}
                     aiel={product.aiel}
+                    locationCode={product.locationCode}
                     rrp={Number(product.rrp)}
                     outOfStock={product.outOfStock || false}
                     onPriceUpdate={handlePriceUpdate}
@@ -1583,6 +2009,144 @@ const ShopDetail = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Transfer Products Dialog */}
+      <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
+        <DialogContent className="w-[95vw] max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle>Transfer Products</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Selected: {selectedProductIds.length} Product{selectedProductIds.length === 1 ? "" : "s"}
+            </p>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Destination Shop</label>
+              <select
+                value={transferDestinationShopId}
+                onChange={(e) => setTransferDestinationShopId(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                disabled={isTransferringProducts}
+              >
+                <option value="">Select destination shop</option>
+                {destinationShops.map((shopOption: any) => (
+                  <option key={shopOption.id} value={shopOption.id}>
+                    {shopOption.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Copy Shop-Specific Data</p>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={copyTransferPrice}
+                  onChange={(e) => setCopyTransferPrice(e.target.checked)}
+                  disabled={isTransferringProducts}
+                />
+                Copy Price
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={copyTransferAisle}
+                  onChange={(e) => setCopyTransferAisle(e.target.checked)}
+                  disabled={isTransferringProducts}
+                />
+                Copy Aisle Number
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={copyTransferLocationCode}
+                  onChange={(e) => setCopyTransferLocationCode(e.target.checked)}
+                  disabled={isTransferringProducts}
+                />
+                Copy Location Code
+              </label>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Duplicate Handling</p>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="duplicateStrategy"
+                  value="skip"
+                  checked={duplicateStrategy === "skip"}
+                  onChange={() => setDuplicateStrategy("skip")}
+                  disabled={isTransferringProducts}
+                />
+                <span>Skip Existing Products (Default)</span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="duplicateStrategy"
+                  value="replace"
+                  checked={duplicateStrategy === "replace"}
+                  onChange={() => setDuplicateStrategy("replace")}
+                  disabled={isTransferringProducts}
+                />
+                <span>Replace Existing Products</span>
+              </label>
+            </div>
+
+            {isTransferringProducts && (
+              <p className="text-sm font-medium text-blue-700">
+                Transferring {selectedProductIds.length} products...
+              </p>
+            )}
+
+            {transferSummary && (
+              <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm space-y-1">
+                <p className="font-semibold text-green-800">Transfer Complete</p>
+                <p>Transferred: {transferSummary.transferred}</p>
+                <p>Skipped: {transferSummary.skipped}</p>
+                <p>Failed: {transferSummary.failed}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowTransferDialog(false)}
+                disabled={isTransferringProducts}
+              >
+                {transferSummary ? "Close" : "Cancel"}
+              </Button>
+              {transferSummary ? (
+                <Button
+                  type="button"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowTransferDialog(false);
+                    cancelSelectionMode();
+                    silentRefetchProductsAtShop();
+                  }}
+                >
+                  Done
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className="flex-1"
+                  onClick={executeTransferProducts}
+                  disabled={isTransferringProducts || selectedProductIds.length === 0 || !transferDestinationShopId}
+                >
+                  {isTransferringProducts ? "Transferring..." : "Confirm Transfer"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog for adding existing product with details */}
       <Dialog open={showAddProductDialog} onOpenChange={(open) => {
           setShowAddProductDialog(open);
@@ -1704,14 +2268,25 @@ const ShopDetail = () => {
               </div>
             </div>
             
-            <div className="space-y-2">
-              <label className="block font-semibold">Aisle Number</label>
-              <Input
-                type="text"
-                placeholder="Enter Aisle Number"
-                value={addProductAiel}
-                onChange={(e) => setAddProductAiel(e.target.value)}
-              />
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
+                <label className="block font-semibold">Aisle Number</label>
+                <Input
+                  type="text"
+                  placeholder="Enter Aisle Number"
+                  value={addProductAiel}
+                  onChange={(e) => setAddProductAiel(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block font-semibold">Location Code</label>
+                <Input
+                  type="text"
+                  placeholder="L3, R2, M1"
+                  value={addProductLocationCode}
+                  onChange={(e) => setAddProductLocationCode(e.target.value)}
+                />
+              </div>
             </div>
             
             <div className="space-y-2">

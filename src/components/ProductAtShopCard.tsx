@@ -28,6 +28,7 @@ interface ProductAtShopCardProps {
   offerPrice?: number;
   offerExpiryDate?: string;
   aiel: string;
+  locationCode?: string;
   rrp: number;
   outOfStock?: boolean;
   onPriceUpdate: (productId: string, newPrice: number) => void;
@@ -96,6 +97,7 @@ export const ProductAtShopCard = ({
   offerPrice,
   offerExpiryDate,
   aiel,
+  locationCode,
   rrp,
   outOfStock = false,
   onPriceUpdate,
@@ -139,6 +141,7 @@ export const ProductAtShopCard = ({
   
   // Direct editing states for aisle and price (always visible)
   const [inlineAisle, setInlineAisle] = useState(aiel || "");
+  const [inlineLocationCode, setInlineLocationCode] = useState(locationCode || "");
   const [inlinePrice, setInlinePrice] = useState(price.toString());
   
   // Multi-promotion dialog state
@@ -188,8 +191,9 @@ export const ProductAtShopCard = ({
       offerExpiryDate ? new Date(offerExpiryDate).toISOString().slice(0, 10) : ""
     );
     setInlineAisle(aiel || "");
+    setInlineLocationCode(locationCode || "");
     setInlinePrice(price.toString());
-  }, [price, offerPrice, offerExpiryDate, aiel]);
+  }, [price, offerPrice, offerExpiryDate, aiel, locationCode]);
 
   useEffect(() => {
     return () => {
@@ -219,6 +223,7 @@ export const ProductAtShopCard = ({
             productId,
             price: newPrice,
             aisle: inlineAisle || null,
+            locationCode: inlineLocationCode || null,
             employeeId,
           }),
           credentials: 'include'
@@ -595,6 +600,16 @@ export const ProductAtShopCard = ({
                 onChange={(e) => setInlineAisle(e.target.value)}
                 className="h-8 text-sm text-center"
                 placeholder="Aisle"
+              />
+            </div>
+            <div className="w-20">
+              <Input
+                type="text"
+                value={inlineLocationCode}
+                onChange={(e) => setInlineLocationCode(e.target.value)}
+                className="h-8 text-sm text-center"
+                placeholder="Location"
+                title="Location Code"
               />
             </div>
             <Button size="sm" onClick={handleInlineSave} className="h-8 px-3">
