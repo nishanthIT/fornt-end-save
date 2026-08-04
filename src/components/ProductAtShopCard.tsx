@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, Tag, Clock, PoundSterling, Pencil, Upload, X, Tags, Barcode, Check, PackageX, Trash2 } from "lucide-react";
+import { Calendar, Tag, Clock, PoundSterling, Pencil, Upload, X, Tags, Barcode, Check, PackageX, Trash2, Layers, Plus } from "lucide-react";
 import { getImageUrl } from "@/utils/imageUtils";
 import { toast } from "sonner";
 import { CategorySelect } from "@/components/CategorySelect";
 import { MultiPromotionDialog } from "@/components/MultiPromotionDialog";
+import { PriceTierDialog } from "@/components/PriceTierDialog";
 import { OptimizedScanner } from "@/components/OptimizedScanner";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -146,6 +147,7 @@ export const ProductAtShopCard = ({
   
   // Multi-promotion dialog state
   const [showMultiPromotionDialog, setShowMultiPromotionDialog] = useState(false);
+  const [showPriceTierDialog, setShowPriceTierDialog] = useState(false);
   const longPressTimerRef = useRef<number | null>(null);
 
   const currentPrice = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date() ? offerPrice : price;
@@ -566,6 +568,15 @@ export const ProductAtShopCard = ({
                 <Tags className="h-4 w-4" />
               </Button>
               <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPriceTierDialog(true)}
+                className="h-8 w-8 p-0"
+                title="Quantity Pricing"
+              >
+                <Layers className="h-4 w-4" />
+              </Button>
+              <Button
                 variant={isUrgentOffer ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setIsEditing(true)}
@@ -706,11 +717,24 @@ export const ProductAtShopCard = ({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium">Case Size</label>
-                <Input
-                  value={editProductCaseSize}
-                  onChange={(e) => setEditProductCaseSize(e.target.value)}
-                  placeholder="e.g. 12"
-                />
+                <div className="flex items-center gap-1">
+                  <Input
+                    value={editProductCaseSize}
+                    onChange={(e) => setEditProductCaseSize(e.target.value)}
+                    placeholder="e.g. 12"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-10 w-10 p-0 flex-shrink-0"
+                    title="Add more case sizes & prices"
+                    onClick={() => setShowPriceTierDialog(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium">Packet Size</label>
@@ -897,6 +921,16 @@ export const ProductAtShopCard = ({
         productTitle={title}
         regularPrice={price}
         onPromotionsUpdated={onProductUpdated}
+      />
+
+      {/* Quantity Pricing Dialog */}
+      <PriceTierDialog
+        open={showPriceTierDialog}
+        onOpenChange={setShowPriceTierDialog}
+        shopId={shopId}
+        productId={productId}
+        productTitle={title}
+        basePrice={price}
       />
 
       {/* Barcode Scanner Dialog */}

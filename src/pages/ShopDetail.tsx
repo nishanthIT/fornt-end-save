@@ -40,6 +40,8 @@ const ShopDetail = () => {
   const [caseBarcode, setCaseBarcode] = useState("");
   const [title, setTitle] = useState("");
   const [caseSize, setCaseSize] = useState("1");
+  // Additional case size/price pairs, stored as PriceTiers on the shop product.
+  const [extraCaseTiers, setExtraCaseTiers] = useState<{ size: string; price: string }[]>([]);
   const [packetSize, setPacketSize] = useState("1");
   const [retailSize, setRetailSize] = useState("");
   const [price, setPrice] = useState("");
@@ -78,6 +80,8 @@ const ShopDetail = () => {
   const [addProductLocationCode, setAddProductLocationCode] = useState("");
   const [addProductRrp, setAddProductRrp] = useState("");
   const [addProductcaseSize , setAddProductcaseSize ] = useState("");
+  // Additional case size/price pairs for the search-and-add flow (saved as PriceTiers).
+  const [addProductExtraTiers, setAddProductExtraTiers] = useState<{ size: string; price: string }[]>([]);
   const [addProductpacketSize, setAddProductpacketSize] = useState("");
   const [addProductCategory, setAddProductCategory] = useState("");
   const [addProductImage, setAddProductImage] = useState<string | null>(null);
@@ -328,6 +332,27 @@ const ShopDetail = () => {
     const finalPacketSize = packetSize || "1";
     const finalRrp = rrp || price; // Default RRP to price if not provided
 
+    // Validate extra case size/price pairs before anything is reset
+    const tiersPayload: { quantity: number; price: number }[] = [];
+    for (const tier of extraCaseTiers) {
+      if (!tier.size && !tier.price) continue; // ignore empty rows
+      const quantity = parseInt(tier.size, 10);
+      const tierPrice = parseFloat(tier.price);
+      if (!Number.isInteger(quantity) || quantity < 2) {
+        toast.warning("Each additional case size must be a whole number of 2 or more");
+        return;
+      }
+      if (isNaN(tierPrice) || tierPrice <= 0) {
+        toast.warning(`Please enter a valid case price for case size ${tier.size}`);
+        return;
+      }
+      if (tiersPayload.some((t) => t.quantity === quantity)) {
+        toast.warning(`Duplicate case size ${quantity}`);
+        return;
+      }
+      tiersPayload.push({ quantity, price: tierPrice });
+    }
+
     // Show uploading toast for long operations (especially with image)
     const hasImage = !!imageFile;
     const uploadingToast = toast.loading(hasImage ? "Adding product with image..." : "Adding product...");
@@ -352,6 +377,7 @@ const ShopDetail = () => {
     // Reset form immediately so user can continue
     setTitle("");
     setCaseSize("1");
+    setExtraCaseTiers([]);
     setPacketSize("1");
     setRetailSize("");
     setPrice("");
@@ -381,6 +407,30 @@ const ShopDetail = () => {
       const result = await response.json();
       
       if (response.ok) {
+        // Save additional case size/price pairs via the existing price-tiers endpoint
+        if (tiersPayload.length > 0 && result.productId) {
+          try {
+            const tiersResponse = await fetch(
+              `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${shopId}/product/${result.productId}/price-tiers`,
+              {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(authToken && { Authorization: `Bearer ${authToken}` }),
+                },
+                credentials: "include",
+                body: JSON.stringify({ tiers: tiersPayload }),
+              }
+            );
+            if (!tiersResponse.ok) {
+              const tiersResult = await tiersResponse.json();
+              toast.warning(`Product added, but case prices failed: ${tiersResult.error || "unknown error"}`);
+            }
+          } catch {
+            toast.warning("Product added, but saving the extra case prices failed");
+          }
+        }
+
         toast.dismiss(uploadingToast);
         toast.success("Product added successfully!");
         
@@ -452,6 +502,7 @@ const ShopDetail = () => {
     setAddProductRrp(product.rrp || "");
     setAddProductpacketSize(product.packetSize || ""); 
     setAddProductcaseSize(product.caseSize || ""); 
+    setAddProductExtraTiers([]);
     setAddProductCategory(product.category || "");
     // Properly clear image state - revoke old URL to prevent memory leaks
     if (addProductImage) {
@@ -497,7 +548,28 @@ const ShopDetail = () => {
     }
     
     console.log("Adding product:", { shopId, productId: selectedProduct.id, employeeId });
-    
+
+    // Validate extra case size/price pairs before the dialog closes
+    const extraTiersPayload: { quantity: number; price: number }[] = [];
+    for (const tier of addProductExtraTiers) {
+      if (!tier.size && !tier.price) continue; // ignore empty rows
+      const quantity = parseInt(tier.size, 10);
+      const tierPrice = parseFloat(tier.price);
+      if (!Number.isInteger(quantity) || quantity < 2) {
+        toast.warning("Each additional case size must be a whole number of 2 or more");
+        return;
+      }
+      if (isNaN(tierPrice) || tierPrice <= 0) {
+        toast.warning(`Please enter a valid case price for case size ${tier.size}`);
+        return;
+      }
+      if (extraTiersPayload.some((t) => t.quantity === quantity)) {
+        toast.warning(`Duplicate case size ${quantity}`);
+        return;
+      }
+      extraTiersPayload.push({ quantity, price: tierPrice });
+    }
+
     // Close dialog immediately
     setShowAddProductDialog(false);
     
@@ -522,6 +594,32 @@ const ShopDetail = () => {
     if (addProductImage) URL.revokeObjectURL(addProductImage);
     setAddProductImage(null);
     setAddProductImageFile(null);
+    setAddProductExtraTiers([]);
+
+    // Persist the extra case size/price pairs via the existing price-tiers endpoint
+    const saveExtraTiers = async (authToken: string | null) => {
+      if (extraTiersPayload.length === 0) return;
+      try {
+        const tiersResponse = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/shop/${shopId}/product/${capturedSelectedProduct.id}/price-tiers`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              ...(authToken && { Authorization: `Bearer ${authToken}` }),
+            },
+            credentials: "include",
+            body: JSON.stringify({ tiers: extraTiersPayload }),
+          }
+        );
+        if (!tiersResponse.ok) {
+          const tiersResult = await tiersResponse.json();
+          toast.warning(`Product added, but case prices failed: ${tiersResult.error || "unknown error"}`);
+        }
+      } catch {
+        toast.warning("Product added, but saving the extra case prices failed");
+      }
+    };
     
     try {
       const authToken = localStorage.getItem("auth_token");
@@ -554,6 +652,7 @@ const ShopDetail = () => {
         const result = await response.json();
 
         if (response.ok) {
+          await saveExtraTiers(authToken);
           toast.dismiss(uploadingToast);
           toast.success("Product added to shop successfully!");
           setRefreshTrigger(prev => prev + 1);
@@ -593,6 +692,7 @@ const ShopDetail = () => {
         const result = await response.json();
 
         if (response.ok) {
+          await saveExtraTiers(authToken);
           toast.dismiss(uploadingToast);
           toast.success("Product added to shop successfully!");
           setRefreshTrigger(prev => prev + 1);
@@ -1335,7 +1435,57 @@ const ShopDetail = () => {
                   {/* Case Size */}
                   <div className="space-y-1">
                     <label className="text-sm text-muted-foreground">Case Size (default: 1)</label>
-                    <Input type="text" placeholder="Enter Case Size" value={caseSize} onChange={(e) => setCaseSize(e.target.value)} />
+                    <div className="flex items-center gap-2">
+                      <Input type="text" placeholder="Enter Case Size" value={caseSize} onChange={(e) => setCaseSize(e.target.value)} className="flex-1" />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="flex-shrink-0"
+                        title="Add another case size"
+                        onClick={() => setExtraCaseTiers((prev) => [...prev, { size: "", price: "" }])}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {extraCaseTiers.map((tier, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Case Size"
+                          value={tier.size}
+                          onChange={(e) => {
+                            const size = e.target.value.replace(/\D/g, "");
+                            setExtraCaseTiers((prev) => prev.map((t, i) => (i === index ? { ...t, size } : t)));
+                          }}
+                          className="w-24"
+                        />
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="Case Price (e.g. 3000 = £30.00)"
+                            value={tier.price}
+                            onChange={(e) => {
+                              const price = formatPriceInput(e.target.value.replace(/[^0-9]/g, ""));
+                              setExtraCaseTiers((prev) => prev.map((t, i) => (i === index ? { ...t, price } : t)));
+                            }}
+                            className="pl-7"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="flex-shrink-0 text-red-500 hover:text-red-700"
+                          onClick={() => setExtraCaseTiers((prev) => prev.filter((_, i) => i !== index))}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
 
                   {/* Packet Size */}
@@ -2305,12 +2455,63 @@ const ShopDetail = () => {
             
             <div className="space-y-2">
               <label className="block font-semibold">Case Size</label>
-              <Input
-                type="text"
-                placeholder="e.g. 1, 12, 500ml"
-                value={addProductcaseSize}
-                onChange={(e) => setAddProductcaseSize(e.target.value)}
-              />
+              <div className="flex items-center gap-2">
+                <Input
+                  type="text"
+                  placeholder="e.g. 1, 12, 500ml"
+                  value={addProductcaseSize}
+                  onChange={(e) => setAddProductcaseSize(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="flex-shrink-0"
+                  title="Add another case size"
+                  onClick={() => setAddProductExtraTiers((prev) => [...prev, { size: "", price: "" }])}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {addProductExtraTiers.map((tier, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Case Size"
+                    value={tier.size}
+                    onChange={(e) => {
+                      const size = e.target.value.replace(/\D/g, "");
+                      setAddProductExtraTiers((prev) => prev.map((t, i) => (i === index ? { ...t, size } : t)));
+                    }}
+                    className="w-24"
+                  />
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">£</span>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Case Price (e.g. 3000 = £30.00)"
+                      value={tier.price}
+                      onChange={(e) => {
+                        const price = formatPriceInput(e.target.value.replace(/[^0-9]/g, ""));
+                        setAddProductExtraTiers((prev) => prev.map((t, i) => (i === index ? { ...t, price } : t)));
+                      }}
+                      className="pl-7"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="flex-shrink-0 text-red-500 hover:text-red-700"
+                    onClick={() => setAddProductExtraTiers((prev) => prev.filter((_, i) => i !== index))}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
             </div>
             
             <div className="space-y-2">
