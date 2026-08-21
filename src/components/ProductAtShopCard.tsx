@@ -40,7 +40,6 @@ interface ProductAtShopCardProps {
   selectionMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: (productId: string) => void;
-  onStartSelection?: (productId: string) => void;
 }
 
 // Helper function to calculate days remaining
@@ -109,7 +108,6 @@ export const ProductAtShopCard = ({
   selectionMode = false,
   isSelected = false,
   onToggleSelect,
-  onStartSelection,
 }: ProductAtShopCardProps) => {
   const { user } = useAuth();
   const employeeId = user?.id;
@@ -148,7 +146,6 @@ export const ProductAtShopCard = ({
   // Multi-promotion dialog state
   const [showMultiPromotionDialog, setShowMultiPromotionDialog] = useState(false);
   const [showPriceTierDialog, setShowPriceTierDialog] = useState(false);
-  const longPressTimerRef = useRef<number | null>(null);
 
   const currentPrice = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date() ? offerPrice : price;
   const hasActiveOffer = offerPrice && offerExpiryDate && new Date(offerExpiryDate) > new Date();
@@ -156,28 +153,9 @@ export const ProductAtShopCard = ({
   // Orange styling only shows when offer expires in 1 day or less
   const isUrgentOffer = hasActiveOffer && daysRemaining <= 1;
 
-  const clearLongPressTimer = () => {
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  };
-
   const isInteractiveTarget = (target: EventTarget | null) => {
     if (!(target instanceof Element)) return false;
     return !!target.closest("button, input, textarea, select, a, label, [role='button']");
-  };
-
-  const handlePressStart = (e: React.MouseEvent | React.TouchEvent) => {
-    if (selectionMode || isInteractiveTarget(e.target)) return;
-    clearLongPressTimer();
-    longPressTimerRef.current = window.setTimeout(() => {
-      onStartSelection?.(productId);
-    }, 500);
-  };
-
-  const handlePressEnd = () => {
-    clearLongPressTimer();
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -196,12 +174,6 @@ export const ProductAtShopCard = ({
     setInlineLocationCode(locationCode || "");
     setInlinePrice(price.toString());
   }, [price, offerPrice, offerExpiryDate, aiel, locationCode]);
-
-  useEffect(() => {
-    return () => {
-      clearLongPressTimer();
-    };
-  }, []);
 
   // Handle inline save for aisle and price
   const handleInlineSave = async () => {
@@ -487,12 +459,6 @@ export const ProductAtShopCard = ({
               ? "ring-2 ring-orange-400 bg-orange-50"
               : ""
       }`}
-      onMouseDown={handlePressStart}
-      onMouseUp={handlePressEnd}
-      onMouseLeave={handlePressEnd}
-      onTouchStart={handlePressStart}
-      onTouchEnd={handlePressEnd}
-      onTouchCancel={handlePressEnd}
       onClick={handleCardClick}
     >
       {selectionMode && (

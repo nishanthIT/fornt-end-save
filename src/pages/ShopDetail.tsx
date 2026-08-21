@@ -6,7 +6,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Store, Phone, MapPin, Plus, Save, PlusCircle, Barcode, Search, Camera, Upload, X, Gift, ArrowRightLeft, Loader2 } from "lucide-react";
+import { Store, Phone, MapPin, Plus, Save, PlusCircle, Barcode, Search, Camera, Upload, X, Gift, ArrowRightLeft, Loader2, CheckSquare } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductCardshop } from "@/components/ProductCardShop";
 import { ProductAtShopCard } from "@/components/ProductAtShopCard";
@@ -1083,9 +1083,10 @@ const ShopDetail = () => {
     }
   };
 
-  const startSelectionMode = (productId: string) => {
+  // Selection mode is entered explicitly from the toolbar button — no long-press.
+  const startSelectionMode = () => {
     setIsSelectionMode(true);
-    setSelectedProductIds((prev) => (prev.includes(productId) ? prev : [...prev, productId]));
+    setSelectedProductIds([]);
   };
 
   const toggleProductSelection = (productId: string) => {
@@ -1957,9 +1958,15 @@ const ShopDetail = () => {
               </div>
             </div>
           ) : (
-            <p className="mb-3 text-xs text-muted-foreground sm:text-sm">
-              Long press any product card to enable multi-select and bulk price editing. Use Transfer Products to select all shop products across pages.
-            </p>
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-muted-foreground sm:text-sm">
+                Turn on Select Mode to multi-select products for bulk price editing. Use Transfer Products to select all shop products across pages.
+              </p>
+              <Button size="sm" variant="outline" onClick={startSelectionMode} className="shrink-0">
+                <CheckSquare className="mr-1.5 h-4 w-4" />
+                Select Mode
+              </Button>
+            </div>
           )}
           
           {!productsAtShopLoading && (
@@ -1998,7 +2005,6 @@ const ShopDetail = () => {
                     selectionMode={isSelectionMode}
                     isSelected={selectedProductIds.includes(product.productId)}
                     onToggleSelect={toggleProductSelection}
-                    onStartSelection={startSelectionMode}
                   />
                 ))
               ) : (
