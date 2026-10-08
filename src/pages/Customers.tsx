@@ -11,10 +11,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Edit, User, Plus, Trash2, Clock, Calendar, TrendingUp, Info } from "lucide-react";
+import { Edit, User, Plus, Trash2, Clock, Calendar, TrendingUp, Info, Users } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import SubscriptionInfoCard from "@/components/SubscriptionInfoCard";
 import { API_CONFIG, getAdminUrl, getAuthUrl } from "@/config/api";
+
+const authHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem("auth_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 interface SubscriptionDetails {
   status: string;
@@ -58,6 +64,7 @@ interface ApiResponse {
 }
 
 const Customers = () => {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
@@ -77,7 +84,7 @@ const Customers = () => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch(getAdminUrl(API_CONFIG.ADMIN.CUSTOMERS));
+      const response = await fetch(getAdminUrl(API_CONFIG.ADMIN.CUSTOMERS), { headers: authHeaders() });
       const data: ApiResponse = await response.json();
       
       if (data.success) {
@@ -128,6 +135,7 @@ const Customers = () => {
     try {
       const response = await fetch(getAdminUrl(API_CONFIG.ADMIN.DELETE_CUSTOMER(id)), {
         method: 'DELETE',
+        headers: authHeaders(),
       });
 
       const data = await response.json().catch(() => null);
@@ -161,6 +169,7 @@ const Customers = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...authHeaders(),
         },
         body: JSON.stringify({
           subscriptionStatus: 'premium',
@@ -188,6 +197,7 @@ const Customers = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...authHeaders(),
         },
         body: JSON.stringify({
           subscriptionStatus: 'free_trial',
@@ -211,6 +221,7 @@ const Customers = () => {
     try {
       const response = await fetch(getAdminUrl(API_CONFIG.ADMIN.PROCESS_EXPIRED_TRIALS), {
         method: 'POST',
+        headers: authHeaders(),
       });
 
       const data = await response.json();
@@ -406,6 +417,16 @@ const Customers = () => {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 lg:flex-col lg:w-auto">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/customers/${customer.id}`)}
+                    title="Customer details and shop employees"
+                    className="flex items-center gap-2"
+                  >
+                    <Users className="h-4 w-4" />
+                    Details
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"

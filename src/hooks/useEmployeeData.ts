@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 type ProductActivity = {
   date: string;
@@ -15,6 +15,9 @@ type Employee = {
   phoneNo: string;
   email: string;
   password?: string;
+  role?: string | null;
+  permissions?: string[];
+  status?: string | null;
 };
 
 type EmployeeWithActivity = Employee & {
@@ -25,6 +28,8 @@ const useEmployeeData = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [activityData, setActivityData] = useState<Record<number, ProductActivity[]>>({});
   const [loading, setLoading] = useState<boolean>(true);
+  const [version, setVersion] = useState(0);
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,7 +60,7 @@ const useEmployeeData = () => {
     };
 
     fetchData();
-  }, []);
+  }, [version]);
 
   const transformData = (data: any) => {
     if (!data.success || !Array.isArray(data.data)) {
@@ -68,7 +73,9 @@ const useEmployeeData = () => {
       name: emp.name,
       phoneNo: emp.phoneNo || emp.phone || '',
       email: emp.email || '',
-      password: emp.password
+      role: emp.role ?? null,
+      permissions: emp.permissions ?? [],
+      status: emp.status ?? null,
     }));
 
     const activityData: Record<number, ProductActivity[]> = {};
@@ -96,6 +103,7 @@ const useEmployeeData = () => {
     employees,
     activityData,
     loading,
+    reload,
   };
 };
 

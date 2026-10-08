@@ -110,31 +110,25 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export const Navbar = () => {
   const [open, setOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, can } = useAuth();
   const navigate = useNavigate();
+  const isAdmin = user?.userType === "ADMIN";
 
-  const adminNavItems = [
-    { icon: Grid, label: "Dashboard", path: "/" },
-    { icon: Box, label: "Products", path: "/products" },
-    { icon: Store, label: "Shops", path: "/shops" },
-    { icon: Users, label: "Customers", path: "/customers" },
-    { icon: UserCircle, label: "Employees", path: "/employees" },
-    { icon: ListTree, label: "Items in User List", path: "/items-in-user-list" },
-    { icon: AlertTriangle, label: "Price Corrections", path: "/price-corrections" },
-    { icon: Image, label: "Promotions", path: "/promotions" },
-    { icon: MonitorPlay, label: "Advertisements", path: "/advertisements" },
-    { icon: Newspaper, label: "News", path: "/news" },
-  ];
-
-  const employeeNavItems = [
-    { icon: Grid, label: "Dashboard", path: "/employee-dashboard" },
-    { icon: Box, label: "Products", path: "/products" },
-    { icon: Store, label: "Shops", path: "/shops" },
-    { icon: ListTree, label: "Items in User List", path: "/items-in-user-list" },
-    { icon: AlertTriangle, label: "Price Corrections", path: "/price-corrections" },
-  ];
-
-  const navItems = user?.userType === "ADMIN" ? adminNavItems : employeeNavItems;
+  // Mirrors the API's company permissions; hiding items is convenience only.
+  const navItems = [
+    isAdmin
+      ? { icon: Grid, label: "Dashboard", path: "/" }
+      : { icon: Grid, label: "Dashboard", path: "/employee-dashboard" },
+    can("catalog.read") && { icon: Box, label: "Products", path: "/products" },
+    can("shops.manage") && { icon: Store, label: "Shops", path: "/shops" },
+    can("customers.view") && { icon: Users, label: "Customers", path: "/customers" },
+    can("staff.manage") && { icon: UserCircle, label: "Company Staff", path: "/employees" },
+    can("list_items.manage") && { icon: ListTree, label: "Items in User List", path: "/items-in-user-list" },
+    can("price_reports.review") && { icon: AlertTriangle, label: "Price Corrections", path: "/price-corrections" },
+    isAdmin && { icon: Image, label: "Promotions", path: "/promotions" },
+    isAdmin && { icon: MonitorPlay, label: "Advertisements", path: "/advertisements" },
+    isAdmin && { icon: Newspaper, label: "News", path: "/news" },
+  ].filter(Boolean) as { icon: typeof Grid; label: string; path: string }[];
 
   const handleLogout = () => {
     logout();
@@ -171,10 +165,10 @@ export const Navbar = () => {
               style={{ color: '#ffffff' }}
             >
               <span className="hidden sm:inline">
-                {user.userType === "ADMIN" ? "Admin Dashboard" : "Employee Dashboard"}
+                {user.userType === "ADMIN" ? "Admin Dashboard" : "Company Staff Dashboard"}
               </span>
               <span className="sm:hidden">
-                {user.userType === "ADMIN" ? "Admin" : "Employee"}
+                {user.userType === "ADMIN" ? "Admin" : "Staff"}
               </span>
             </Link>
           </div>

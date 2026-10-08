@@ -138,25 +138,34 @@ import PromotionManagement from "./pages/PromotionManagement";
 import AdvertisementManagement from "./pages/AdvertisementManagement";
 import NewsManagement from "./pages/NewsManagement";
 import ItemsInUserList from "./pages/ItemsInUserList";
+import CustomerDetails from "./pages/CustomerDetails";
+import AdminListView from "./pages/AdminListView";
+import type { CompanyPermission } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
-// Fix #1: Change allowed roles to uppercase to match the AuthContext
-const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: ("ADMIN" | "EMPLOYEE" | "CUSTOMER")[] }) => {
-  const { user } = useAuth();
+// UX guard only: the API enforces the same company permissions on every request.
+const ProtectedRoute = ({
+  children,
+  permission,
+  adminOnly,
+  staffOnly,
+}: {
+  children: React.ReactNode;
+  permission?: CompanyPermission;
+  adminOnly?: boolean;
+  staffOnly?: boolean;
+}) => {
+  const { user, can } = useAuth();
 
-  if (!user) {
+  if (!user || !user.companyAccess) {
     return <Navigate to="/login" />;
   }
 
-  if (!allowedRoles.includes(user.userType)) {
-    // Fix #3: Use the correct redirection based on user type
-    return <Navigate to={
-      user.userType === "ADMIN" ? "/" : 
-      user.userType === "EMPLOYEE" ? "/employee-dashboard" : 
-      "/customer-dashboard"  // Add a customer dashboard route or appropriate fallback
-    } />;
-  }
+  const home = user.userType === "ADMIN" ? "/" : "/employee-dashboard";
+  if (adminOnly && user.userType !== "ADMIN") return <Navigate to={home} />;
+  if (staffOnly && user.userType === "ADMIN") return <Navigate to="/" />;
+  if (permission && !can(permission)) return <Navigate to={home} />;
 
   return <>{children}</>;
 };
@@ -177,103 +186,106 @@ const App = () => (
                 
                 {/* Admin Routes */}
                 <Route path="/" element={
-                  <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <ProtectedRoute adminOnly>
                     <Dashboard />
                   </ProtectedRoute>
                 } />
                 <Route path="/customers" element={
-                  <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <ProtectedRoute permission="customers.view">
                     <Customers />
                   </ProtectedRoute>
                 } />
+                <Route path="/customers/:customerId" element={
+                  <ProtectedRoute permission="customers.view">
+                    <CustomerDetails />
+                  </ProtectedRoute>
+                } />
+                <Route path="/customers/:customerId/lists/:listId" element={
+                  <ProtectedRoute permission="customers.view">
+                    <AdminListView />
+                  </ProtectedRoute>
+                } />
                 <Route path="/employees" element={
-                  <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <ProtectedRoute permission="staff.manage">
                     <Employees />
                   </ProtectedRoute>
                 } />
                 <Route path="/items-in-user-list" element={
-                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE"]}>
+                  <ProtectedRoute permission="list_items.manage">
                     <ItemsInUserList />
                   </ProtectedRoute>
                 } />
                 <Route path="/price-corrections" element={
-                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE"]}>
+                  <ProtectedRoute permission="price_reports.review">
                     <PriceCorrections />
                   </ProtectedRoute>
                 } />
                 <Route path="/promotions" element={
-                  <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <ProtectedRoute adminOnly>
                     <PromotionManagement />
                   </ProtectedRoute>
                 } />
                 <Route path="/advertisements" element={
-                  <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <ProtectedRoute adminOnly>
                     <AdvertisementManagement />
                   </ProtectedRoute>
                 } />
                 <Route path="/news" element={
-                  <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <ProtectedRoute adminOnly>
                     <NewsManagement />
                   </ProtectedRoute>
                 } />
 
-                {/* Employee Dashboard */}
+                {/* Company staff dashboard */}
                 <Route path="/employee-dashboard" element={
-                  <ProtectedRoute allowedRoles={["EMPLOYEE"]}>
+                  <ProtectedRoute staffOnly>
                     <EmployeeDashboard />
                   </ProtectedRoute>
                 } />
 
-                {/* Shared Routes */}
+                {/* Catalog & wholesale shops */}
                 <Route path="/products" element={
-                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE"]}>
+                  <ProtectedRoute permission="catalog.read">
                     <Products />
                   </ProtectedRoute>
                 } />
                 <Route path="/product/:id" element={
-                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE"]}>
+                  <ProtectedRoute permission="catalog.read">
                     <ProductDetail />
                    </ProtectedRoute>
                 } />
                 <Route path="/shops" element={
-                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE"]}>
+                  <ProtectedRoute permission="shops.manage">
                     <Shops />
                   </ProtectedRoute>
                 } />
                 <Route path="/shop/:id" element={
-                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE"]}>
+                  <ProtectedRoute permission="shops.manage">
                     <ShopDetail />
                   </ProtectedRoute>
                 } />
                 <Route path="/shop/:shopId/add-product" element={
-                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE"]}>
+                  <ProtectedRoute permission="shops.manage">
                     <AddProduct />
                   </ProtectedRoute>
                 } />
                 <Route path="/shop/:shopId/product/:productId" element={
-                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE"]}>
+                  <ProtectedRoute permission="shops.manage">
                     <EditProductPrice />
                   </ProtectedRoute>
                 } />
 
                 {/* Chat Routes */}
                 <Route path="/chat" element={
-                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE", "CUSTOMER"]}>
+                  <ProtectedRoute>
                     <Chat />
                   </ProtectedRoute>
                 } />
                 <Route path="/chat/:chatId" element={
-                  <ProtectedRoute allowedRoles={["ADMIN", "EMPLOYEE", "CUSTOMER"]}>
+                  <ProtectedRoute>
                     <Chat />
                   </ProtectedRoute>
                 } />
-
-                {/* Add a customer dashboard route if needed */}
-                {/* <Route path="/customer-dashboard" element={
-                  <ProtectedRoute allowedRoles={["CUSTOMER"]}>
-                    <CustomerDashboard />
-                  </ProtectedRoute>
-                } /> */}
               </Routes>
               </main>
             </div>

@@ -11,7 +11,9 @@ class SocketService {
 
     this.socket = io(serverUrl, {
       withCredentials: true,
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      // The server only joins authenticated sockets to private user/chat rooms.
+      auth: { token: localStorage.getItem('auth_token') }
     });
 
     this.socket.on('connect', () => {

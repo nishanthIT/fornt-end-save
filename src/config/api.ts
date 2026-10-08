@@ -12,6 +12,13 @@ export const API_CONFIG = {
     UPDATE_LIST_ITEM_CASE_BARCODE: '/admin/list-items/case-barcode',
     UPDATE_LIST_ITEM: '/admin/list-items',
     EMPLOYEE_LIST_ITEM_UPDATES: (employeeId: number) => `/admin/employees/${employeeId}/list-item-updates`,
+    CUSTOMER_EMPLOYEES: (customerId: number | string) => `/admin/customers/${customerId}/employees`,
+    LIST: (listId: string) => `/admin/lists/${listId}`,
+    STAFF_GRANT: '/admin/staff/grant',
+    STAFF_STATUS: (employeeId: number) => `/admin/staff/${employeeId}/status`,
+    ACCESS_REVIEWS: '/admin/access-reviews',
+    ASSIGNABLE_SHOPS: '/admin/access-reviews/assignable-shops',
+    RESOLVE_ACCESS_REVIEW: (reviewId: string) => `/admin/access-reviews/${reviewId}/resolve`,
   },
   
   // Auth endpoints

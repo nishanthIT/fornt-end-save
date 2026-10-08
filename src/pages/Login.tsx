@@ -310,7 +310,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { NoCompanyAccessError, useAuth } from "../contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -342,10 +342,8 @@ const Login = () => {
   const redirectUser = (userType: string) => {
     if (userType === "ADMIN") {
       navigate("/");
-    } else if (userType === "EMPLOYEE") {
+    } else {
       navigate("/employee-dashboard");
-    } else if (userType === "CUSTOMER") {
-      navigate("/");
     }
   };
 
@@ -383,7 +381,9 @@ const Login = () => {
       console.error("Login error:", error);
       toast({
         title: "Login Failed",
-        description: "Invalid credentials. Please try again.",
+        description: error instanceof NoCompanyAccessError
+          ? error.message
+          : "Invalid credentials. Please try again.",
         variant: "destructive",
       });
     } finally {

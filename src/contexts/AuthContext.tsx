@@ -4,11 +4,29 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import axios from "axios";
 
+export type CompanyPermission =
+  | "catalog.read"
+  | "catalog.write"
+  | "shops.manage"
+  | "list_items.manage"
+  | "price_reports.review"
+  | "customers.view"
+  | "customers.manage"
+  | "staff.manage"
+  | "content.manage";
+
+interface CompanyAccess {
+  role: string;
+  permissions: CompanyPermission[];
+}
+
 interface User {
   id: number;
   email: string;
   userType: "ADMIN" | "EMPLOYEE" | "CUSTOMER";
   name?: string;
+  // Only company staff membership (or the Admin table) grants access to this dashboard.
+  companyAccess: CompanyAccess | null;
 }
 
 interface AuthContextType {
@@ -17,7 +35,10 @@ interface AuthContextType {
   logout: () => Promise<void>;
   loading: boolean;
   checkAuthStatus: () => Promise<boolean>;
+  can: (permission: CompanyPermission) => boolean;
 }
+
+export class NoCompanyAccessError extends Error {}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -57,11 +78,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log("verified in reload")
       console.log(response.data.user);
       
-      if (response.data.user) {
+      if (response.data.user?.companyAccess) {
         console.log("User authenticated:", response.data.user);
         setUser(response.data.user);
         return true;
       }
+      // Shop owners and shop employees have no business in the company dashboard.
+      localStorage.removeItem('auth_token');
+      setUser(null);
       return false;
     } catch (err) {
       console.error("Auth check failed:", err);
@@ -81,6 +105,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userType,
       });
       
+      if (!response.data.user?.companyAccess) {
+        await axios.post("/auth/logout").catch(() => undefined);
+        throw new NoCompanyAccessError(
+          "This account has no company staff access. Shop employees should use the Paymi app."
+        );
+      }
+
       // Store the token in localStorage as backup
       if (response.data.token) {
         localStorage.setItem('auth_token', response.data.token);
@@ -118,8 +149,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const can = (permission: CompanyPermission) =>
+    !!user?.companyAccess?.permissions?.includes(permission);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, checkAuthStatus }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, checkAuthStatus, can }}>
       {children}
     </AuthContext.Provider>
   );

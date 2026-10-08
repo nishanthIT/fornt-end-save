@@ -22,6 +22,24 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import useEmployeeData from "@/hooks/useEmployeeData"; // Adjust the import pat
 import { adminListItemsService, ListItemUpdateLog, ListItemUpdateSummary } from "@/services/adminListItemsService";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "@/contexts/AuthContext";
+import { API_CONFIG, getAdminUrl } from "@/config/api";
+import { COMPANY_PERMISSION_OPTIONS, DEFAULT_STAFF_PERMISSIONS, permissionLabel } from "@/config/permissions";
+import { PermissionChecklist } from "@/components/PermissionChecklist";
+import { AccessReview, AccessReviewDialog, ReviewAction } from "@/components/AccessReviewDialog";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+
+const authHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem("auth_token");
+  return { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+};
+
+const PermissionPicker = ({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) => (
+  <PermissionChecklist title="Company permissions" options={COMPANY_PERMISSION_OPTIONS} value={value} onChange={onChange} />
+);
 
 
 interface Employee {
@@ -30,6 +48,9 @@ interface Employee {
   phoneNo: string;
   email:string;
   password?: string;
+  role?: string | null;
+  permissions?: string[];
+  status?: string | null;
 }
 
 interface ProductActivity {
@@ -43,7 +64,12 @@ interface ProductActivity {
 const Employees = () => {
 
 
-  const { employees:mockEmployees, activityData:mockActivityData, loading } = useEmployeeData();
+  const { employees:mockEmployees, activityData:mockActivityData, loading, reload } = useEmployeeData();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.userType === "ADMIN";
+  const [reviews, setReviews] = useState<AccessReview[]>([]);
+  const [reviewsVersion, setReviewsVersion] = useState(0);
+  const [reviewAction, setReviewAction] = useState<{ review: AccessReview; action: ReviewAction } | null>(null);
 
 
   const [employees, setEmployees] = useState(mockEmployees);
@@ -61,7 +87,18 @@ const Employees = () => {
     phoneNo: "",
     email:"",
     password: "",
+    permissions: DEFAULT_STAFF_PERMISSIONS,
   });
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    fetch(`${API_BASE}${API_CONFIG.ADMIN.ACCESS_REVIEWS}?status=OPEN`, { headers: authHeaders() })
+      .then((r) => r.json())
+      .then((body) => setReviews(body?.success ? body.data : []))
+      .catch(() => setReviews([]));
+  }, [isSuperAdmin, reviewsVersion]);
+
+  const resolveReview = (review: AccessReview, action: ReviewAction) => setReviewAction({ review, action });
 
   useEffect(() => {
     setEmployees(mockEmployees);
@@ -103,28 +140,20 @@ const Employees = () => {
 
 
   const handleDelete = async (id) => {
-    const confirmDelete = window.confirm("Are you sure you want to delete this employee?");
+    const confirmDelete = window.confirm("Remove this person's company staff access? Their account and any shop membership or lists are kept.");
     if (confirmDelete) {
       try {
-        // Send a DELETE request to the server
-        const authToken = localStorage.getItem("auth_token");
-        await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/deleteEmployee/${id}`, {
+        const response = await fetch(`${API_BASE}/deleteEmployee/${id}`, {
           method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            ...(authToken && { Authorization: `Bearer ${authToken}` }),
-
-          },
-           credentials: 'include'
+          headers: authHeaders(),
+          credentials: 'include'
         });
-  
-        // Update the state to remove the deleted employee from the UI
-        setEmployees((prevEmployees) => prevEmployees.filter((employee) => employee.id !== id));
-  
-        alert("Employee deleted successfully!");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        reload();
+        toast.success("Company access removed");
       } catch (error) {
-        console.error("Error deleting employee:", error);
-        alert("Failed to delete the employee. Please try again.");
+        console.error("Error removing company access:", error);
+        toast.error("Failed to remove company access. Please try again.");
       }
     }
   };
@@ -149,27 +178,26 @@ const Employees = () => {
 
   const handleSave = async () => {
     try {
-      const authToken = localStorage.getItem("auth_token");
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/updateEmployee/${editingEmployee.id}`, {
+      const response = await fetch(`${API_BASE}/updateEmployee/${editingEmployee.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(authToken && { Authorization: `Bearer ${authToken}` }),
-        },
-        body: JSON.stringify(editingEmployee),
+        headers: authHeaders(),
+        body: JSON.stringify({
+          name: editingEmployee.name,
+          phoneNo: editingEmployee.phoneNo,
+          email: editingEmployee.email,
+          ...(editingEmployee.password ? { password: editingEmployee.password } : {}),
+          permissions: editingEmployee.permissions ?? [],
+          status: editingEmployee.status ?? 'ACTIVE',
+        }),
          credentials: 'include'
       });
   
       if (response.ok) {
-        const updatedEmployee = await response.json();
-        setEmployees(
-          employees.map((emp) =>
-            emp.id === updatedEmployee.id ? updatedEmployee : emp
-          )
-        );
-        toast.success('Employee updated successfully!');
+        reload();
+        toast.success('Company staff member updated');
       } else {
-        toast.error('Failed to update employee.');
+        const body = await response.json().catch(() => null);
+        toast.error(body?.error || 'Failed to update staff member.');
       }
     } catch (error) {
       console.error('Error updating employee:', error);
@@ -184,35 +212,50 @@ const Employees = () => {
 
   const handleAdd = async () => {
     try {
-      const authToken = localStorage.getItem("auth_token");
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"}/addEmployee`, {
+      const response = await fetch(`${API_BASE}/addEmployee`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(authToken && { Authorization: `Bearer ${authToken}` }),
-        },
+        headers: authHeaders(),
         body: JSON.stringify({
           name: newEmployee.name,
           phoneNo: newEmployee.phoneNo,
           email: newEmployee.email,
           password: newEmployee.password,
+          permissions: newEmployee.permissions,
         }),
          credentials: 'include'
       });
+      const body = await response.json().catch(() => null);
   
       if (response.ok) {
-        const addedEmployee = await response.json();
-        setEmployees([...employees, addedEmployee]);
-        toast.success('Employee added successfully!');
+        reload();
+        toast.success('Company staff member added');
+      } else if (response.status === 409 && body?.code === 'ACCOUNT_EXISTS') {
+        // An existing (e.g. shop employee) account needs an explicit, separate company grant.
+        const grant = window.confirm(
+          'An employee account with this email already exists. Grant it company staff access with the selected permissions? Any shop membership stays unchanged.'
+        );
+        if (grant) {
+          const res = await fetch(getAdminUrl(API_CONFIG.ADMIN.STAFF_GRANT), {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ employeeId: body.employeeId, permissions: newEmployee.permissions }),
+          });
+          if (res.ok) {
+            reload();
+            toast.success('Company access granted');
+          } else {
+            toast.error('Failed to grant company access');
+          }
+        }
       } else {
-        toast.error('Failed to add employee. Please try again.');
+        toast.error(body?.error || 'Failed to add staff member. Please try again.');
       }
     } catch (error) {
       console.error('Error adding employee:', error);
       toast.error('Something went wrong. Please try again later.');
     } finally {
       setIsAdding(false);
-      setNewEmployee({ name: '', phoneNo: '', email: '', password: '' });
+      setNewEmployee({ name: '', phoneNo: '', email: '', password: '', permissions: DEFAULT_STAFF_PERMISSIONS });
     }
   };
 
@@ -305,13 +348,61 @@ if(loading) {
 
 
     <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Employees</h1>
+      <div className="flex justify-between items-center mb-2">
+        <h1 className="text-2xl font-bold">Company Staff</h1>
         <Button onClick={() => setIsAdding(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Employee
+          Add Company Staff
         </Button>
       </div>
+      <p className="text-sm text-muted-foreground mb-6">
+        Your own employees and their company permissions. Shop Employees created by customers are shown under
+        Customers → Customer details → Employees and never appear here.
+      </p>
+
+      {isSuperAdmin && reviews.length > 0 && (
+        <Card className="mb-6 border-orange-300">
+          <CardContent className="p-4 space-y-3">
+            <h2 className="font-semibold">Needs review ({reviews.length})</h2>
+            <p className="text-sm text-muted-foreground">
+              These accounts could not be safely classified by the access migration and currently have no company or
+              shop access.
+            </p>
+            {reviews.map((review) => (
+              <div key={review.id} className="border rounded-md p-3 text-sm space-y-2">
+                <div className="font-medium">
+                  {review.employee.name} · {review.employee.email}
+                </div>
+                <div className="text-muted-foreground">
+                  {review.reason} — {String(review.evidence?.detail ?? "")} · catalog actions:{" "}
+                  {String(review.evidence?.wholesaleCatalogActions ?? 0)} · lists: {String(review.evidence?.listCount ?? 0)}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => resolveReview(review, "GRANT_COMPANY")}>
+                    Grant company access
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => resolveReview(review, "ASSIGN_SHOP")}>
+                    Assign to customer shop
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => resolveReview(review, "NO_ACCESS")}>
+                    Keep without access
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <AccessReviewDialog
+        review={reviewAction?.review ?? null}
+        action={reviewAction?.action ?? null}
+        onClose={() => setReviewAction(null)}
+        onResolved={() => {
+          setReviewsVersion((v) => v + 1);
+          reload();
+        }}
+      />
 
       {/* <div className="space-y-4">
         {employees.map((employee) => (
@@ -381,6 +472,15 @@ if(loading) {
               <div className="flex items-center mb-2">
                 <label className="font-bold text-gray-700 mr-2">Email:</label>
                 <p className="text-sm text-gray-500">{employee.email || "Not Provided"}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1">
+                <Badge variant={employee.status === "ACTIVE" ? "default" : "outline"}>
+                  {(employee.status || "unknown").toLowerCase()}
+                </Badge>
+                {employee.role === "MANAGER" && <Badge variant="secondary">manager</Badge>}
+                {(employee.permissions ?? []).map((p) => (
+                  <Badge key={p} variant="secondary">{permissionLabel(p)}</Badge>
+                ))}
               </div>
             </div>
           </div>
@@ -580,7 +680,7 @@ if(loading) {
      <Dialog open={isEditing} onOpenChange={setIsEditing}>
   <DialogContent>
     <DialogHeader>
-      <DialogTitle>Edit Employee</DialogTitle>
+      <DialogTitle>Edit Company Staff</DialogTitle>
     </DialogHeader>
     <div className="space-y-4 py-4">
       <div className="space-y-2">
@@ -629,6 +729,19 @@ if(loading) {
           }
         />
       </div>
+      <PermissionPicker
+        value={editingEmployee?.permissions ?? []}
+        onChange={(permissions) => setEditingEmployee({ ...editingEmployee, permissions })}
+      />
+      <label className="flex items-center gap-2 text-sm">
+        <Checkbox
+          checked={(editingEmployee?.status ?? "ACTIVE") === "ACTIVE"}
+          onCheckedChange={(checked) =>
+            setEditingEmployee({ ...editingEmployee, status: checked ? "ACTIVE" : "INACTIVE" })
+          }
+        />
+        Company access active
+      </label>
       <Button onClick={handleSave} className="w-full">
         Save Changes
       </Button>
@@ -679,7 +792,7 @@ if(loading) {
       <Dialog open={isAdding} onOpenChange={setIsAdding}>
   <DialogContent>
     <DialogHeader>
-      <DialogTitle>Add New Employee</DialogTitle>
+      <DialogTitle>Add Company Staff</DialogTitle>
     </DialogHeader>
     <div className="space-y-4 py-4">
       <div className="space-y-2">
@@ -731,8 +844,12 @@ if(loading) {
           }
         />
       </div>
+      <PermissionPicker
+        value={newEmployee.permissions ?? []}
+        onChange={(permissions) => setNewEmployee({ ...newEmployee, permissions })}
+      />
       <Button onClick={handleAdd} className="w-full">
-        Add Employee
+        Add Company Staff
       </Button>
     </div>
   </DialogContent>
