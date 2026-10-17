@@ -14,7 +14,8 @@ import { API_CONFIG } from "@/config/api";
 
 interface PriceReport {
   id: string;
-  reporterId: number;
+  reporterId: number | null;
+  reporterType?: 'CUSTOMER' | 'EMPLOYEE' | 'ADMIN';
   productId: string;
   shopId: string;
   currentPrice: number;
@@ -29,6 +30,7 @@ interface PriceReport {
     id: number;
     name: string;
     email: string;
+    userType?: 'CUSTOMER' | 'EMPLOYEE' | 'ADMIN';
   };
   product: {
     id: string;
@@ -165,7 +167,10 @@ const PriceCorrections: React.FC = () => {
       if (response.ok) {
         const result = await response.json();
         console.log('✅ Success response:', result);
-        toast.success('✅ Report approved! Price updated and 1 point awarded to reporter.');
+        const pointsAwarded = Number(result.pointsAwarded);
+        toast.success(pointsAwarded > 0
+          ? `Report approved! Price updated and ${pointsAwarded} ${pointsAwarded === 1 ? 'point' : 'points'} awarded to the reporter.`
+          : 'Report approved! Price updated.');
         
         // Update the pending reports list immediately by removing the approved report
         setPendingReports(prev => prev.filter(r => r.id !== reportId));
@@ -353,7 +358,9 @@ const PriceCorrections: React.FC = () => {
                 <DialogHeader>
                   <DialogTitle>Approve Price Report</DialogTitle>
                   <DialogDescription>
-                    This will update the product price and award 1 point to the reporter.
+                    {(report.reporter.userType ?? report.reporterType ?? 'CUSTOMER') === 'CUSTOMER'
+                      ? 'This will update the product price and award 1 point to the reporter.'
+                      : 'This will update the product price. Employee and admin reports do not earn customer points.'}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">

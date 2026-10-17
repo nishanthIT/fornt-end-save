@@ -70,16 +70,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const checkAuthStatus = async (): Promise<boolean> => {
     setLoading(true);
     try {
-      console.log("Checking auth status...");
-      console.log("Cookies present:", document.cookie);
-      console.log("Token in localStorage:", localStorage.getItem('auth_token'));
       
       const response = await axios.get("/auth/me");
-      console.log("verified in reload")
-      console.log(response.data.user);
       
       if (response.data.user?.companyAccess) {
-        console.log("User authenticated:", response.data.user);
         setUser(response.data.user);
         return true;
       }
@@ -88,7 +82,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null);
       return false;
     } catch (err) {
-      console.error("Auth check failed:", err);
+      console.error("Auth check failed");
       setUser(null);
       return false;
     } finally {
@@ -115,15 +109,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Store the token in localStorage as backup
       if (response.data.token) {
         localStorage.setItem('auth_token', response.data.token);
-        console.log("Token saved to localStorage");
       }
       
-      console.log("Login successful:", response.data.user);
-      console.log("Cookies after login:", document.cookie);
       
       setUser(response.data.user);
     } catch (err) {
-      console.error("Login failed:", err);
+      console.error("Login failed");
       throw err;
     } finally {
       setLoading(false);
@@ -139,7 +130,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null);
       window.location.href = "/login";
     } catch (err) {
-      console.error("Logout failed:", err);
+      console.error("Logout failed");
       // Still clear localStorage and user state on failed logout
       localStorage.removeItem('auth_token');
       setUser(null);

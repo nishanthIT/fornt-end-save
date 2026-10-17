@@ -1,3 +1,5 @@
+import Moderation from './pages/Moderation';
+import Supermarkets from './pages/Supermarkets';
 // import { Toaster } from "@/components/ui/toaster";
 // import { Toaster as Sonner } from "@/components/ui/sonner";
 // import { TooltipProvider } from "@/components/ui/tooltip";
@@ -45,7 +47,8 @@
 //             <div className="min-h-screen">
 //               <Navbar />
 //               <Routes>
-//                 <Route path="/login" element={<Login />} />
+//                 <Route path="/moderation" element={<ProtectedRoute adminOnly><Moderation /></ProtectedRoute>} />
+                <Route path="/login" element={<Login />} />
                 
 //                 {/* Admin Routes */}
 //                 <Route path="/" element={
@@ -182,6 +185,7 @@ const App = () => (
               <Navbar />
               <main className="pt-16">
                 <Routes>
+                <Route path="/moderation" element={<ProtectedRoute adminOnly><Moderation /></ProtectedRoute>} />
                 <Route path="/login" element={<Login />} />
                 
                 {/* Admin Routes */}
@@ -190,6 +194,7 @@ const App = () => (
                     <Dashboard />
                   </ProtectedRoute>
                 } />
+                <Route path="/supermarkets" element={<ProtectedRoute permission="customers.view"><Supermarkets /></ProtectedRoute>} />
                 <Route path="/customers" element={
                   <ProtectedRoute permission="customers.view">
                     <Customers />

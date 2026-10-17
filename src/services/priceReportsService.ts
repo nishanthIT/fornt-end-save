@@ -4,7 +4,8 @@ const API_BASE = API_CONFIG.BASE_URL;
 
 export interface PriceReport {
   id: string;
-  reporterId: number;
+  reporterId: number | null;
+  reporterType?: 'CUSTOMER' | 'EMPLOYEE' | 'ADMIN';
   productId: string;
   shopId: string;
   currentPrice: number;
@@ -19,6 +20,7 @@ export interface PriceReport {
     id: number;
     name: string;
     email: string;
+    userType?: 'CUSTOMER' | 'EMPLOYEE' | 'ADMIN';
   };
   product: {
     id: string;
